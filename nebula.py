@@ -38,5 +38,5 @@ def process(line, state, items):
 
         break
 
-    state[('nebula', url, 'since_timestamp')] = recent_timestamp
+    state[('nebula', url, 'since_timestamp')] = recent_timestamp or since_timestamp
 
