@@ -27,6 +27,9 @@ def process_file(descfilename):
                 elif line.startswith('nebula:'):
                     import nebula
                     nebula.process(line, state, items)
+                elif line.startswith('github-branch:'):
+                    import github
+                    github.process(line, state, items)
                 elif line.startswith('include:'):
                     process_file(line.split(':', 1)[1])
                 else:
