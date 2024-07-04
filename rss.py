@@ -20,7 +20,7 @@ def process(line, state, items):
         return
 
     for entry in d.entries:
-        updated = entry.get('updated_parsed')
+        updated = entry.get('published_parsed') or entry.get('updated_parsed')
         if updated:
             if latest_entry and latest_entry >= updated:
                 continue
