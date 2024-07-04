@@ -57,9 +57,17 @@ def process(line, state, items):
         else:
             content = ''
 
+        if 'media_thumbnail' in entry:
+            thumbnail = entry['media_thumbnail']
+            if 'url' in thumbnail:
+                if 'width' in thumbnail and 'height' in thumbnail:
+                    content = f"""<p><img src="{thumbnail['url']} width="{thumbnail['width']}" height="{thumbnail['height']}"></p>""" + content
+                else:
+                    content = f"""<p><img src="{thumbnail['url']}></p>""" + content
+
         items.append((f"""
 
-<h1><a href="{entry.get("link")}">{author_name} {entry.get("title")}</a> {iso_date}</h1> {anchor}
+<h1><a href="{entry.get("link")}">{author_name} {entry.get("title")}</a> {iso_date} {anchor}</h1>
 
 {content}""", iso_date))
 
