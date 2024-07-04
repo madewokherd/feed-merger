@@ -115,7 +115,10 @@ def process(line, state, items):
             new_since_id = json_response[0]['id']
 
         for item in json_response:
-            status_url = parse._replace(fragment="", query="", path=f"/web/statuses/{item['id']}").geturl()
+            if item.get('reblog'):
+                status_url = parse._replace(fragment="", query="", path=f"/web/statuses/{item['reblog']['id']}").geturl()
+            else:
+                status_url = parse._replace(fragment="", query="", path=f"/web/statuses/{item['id']}").geturl()
 
             content = format_status(item, status_url)
 
