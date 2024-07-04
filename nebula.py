@@ -2,6 +2,8 @@ import json
 import urllib.parse
 import urllib.request
 
+from html import escape as e
+
 def process(line, state, items):
     url = line.split(':', 1)[1] #remove nebula:
 
@@ -21,11 +23,13 @@ def process(line, state, items):
             if since_timestamp and since_timestamp >= video['published_at']:
                 break
 
+            broken_description = e(video['description']).replace('\n', '<br>')
+
             items.append((f"""
 
 <h1><a href="{video['share_url']}">{video['channel_title']} - {video['title']}</a> {video['published_at']} <a name="{video['slug']}" href="#{video['slug']}">[anchor]</a></h1>
 
-<p>{video['description']}</p>
+<p>{broken_description}</p>
 
 <p><img width=320 height=180 src="{video['images']['thumbnail']['src']}"></p>""", video['published_at']))
 
