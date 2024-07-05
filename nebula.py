@@ -29,9 +29,9 @@ def process(line, state, items):
 
 <h1><a href="{video['share_url']}">{video['channel_title']} - {video['title']}</a> {video['published_at']} <a name="{video['slug']}" href="#{video['slug']}">[anchor]</a></h1>
 
-<p>{broken_description}</p>
+<p><img width=320 height=180 src="{video['images']['thumbnail']['src']}"></p>
 
-<p><img width=320 height=180 src="{video['images']['thumbnail']['src']}"></p>""", video['published_at']))
+<p>{broken_description}</p>""", video['published_at']))
 
         else:
             if not since_timestamp:
