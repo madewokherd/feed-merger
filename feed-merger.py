@@ -36,6 +36,9 @@ def process_file(descfilename):
                 elif line.startswith('rss:'):
                     import rss
                     rss.process(line, state, items)
+                elif line.startswith('reddit:'):
+                    import reddit
+                    reddit.process(line, state, items)
                 elif line.startswith('include:'):
                     process_file(line.split(':', 1)[1])
                 else:
