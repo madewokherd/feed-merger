@@ -140,27 +140,44 @@ def api_request(state, url):
         print(e.fp.read())
         raise
 
-def process_subreddit(subreddit, state, items):
-    latest = state.get(('reddit', 'subreddit', subreddit, 'latest'))
+def process_entry(entry, state, items):
+    # TODO: other entry types besides link
+
+    if entry['over_18'] and not agegate.check(state):
+        return
+
+    posted = datetime.datetime.fromtimestamp(entry['created'], datetime.timezone.utc).isoformat()
+
+    items.append((f"""
+
+<h1><a href="https://www.reddit.com/{entry['permalink'].lstrip('/')}">{entry['permalink'][1:entry['permalink'].find('/', 3)]} - {e(entry['author'])} - {e(entry['title'])}</a> {posted} <a name="{entry['name']}" href="#{entry['name']}">[anchor]</a></h1>
+
+{entry['selftext_html']}
+""", posted))
+
+def process_search_links(query, state, items):
+    latest = state.get(('reddit', 'search', 'links', query, 'latest'))
     new_latest = None
     last = None
 
-    url = f"https://oauth.reddit.com/r/{subreddit}/new"
+    url = f"https://oauth.reddit.com/search"
+
+    query_dict = {
+        'raw_json': 1,
+        'type': 'link',
+        'q': query,
+        'sort': 'new',
+        't': 'all',
+    }
 
     if latest:
-        query = urllib.parse.urlencode({
-            'before': latest,
-            'limit': 100,
-            'raw_json': 1,
-        })
-    else:
-        query = urllib.parse.urlencode({
-            'raw_json': 1,
-        })
+        query_dict['before'] = latest
+        query_dict['limit'] = 100
 
     count = 0
 
     while True:
+        query = urllib.parse.urlencode(query_dict)
         url = urllib.parse.urlparse(url)._replace(query=query).geturl()
 
         json = api_request(state, url)
@@ -173,29 +190,50 @@ def process_subreddit(subreddit, state, items):
             if new_latest is None:
                 new_latest = entry['name']
 
-            if entry['over_18'] and not agegate.check(state):
-                continue
-            
-            content = e(entry['selftext']).replace('\n', '<br>')
-
-            posted = datetime.datetime.fromtimestamp(entry['created'], datetime.timezone.utc).isoformat()
-
-            items.append((f"""
-
-<h1><a href="https://www.reddit.com/{entry['permalink']}">r/{subreddit} - {e(entry['author'])} - {e(entry['title'])}</a> {posted} <a name="{entry['name']}" href="#{entry['name']}">[anchor]</a></h1>
-
-{entry['selftext_html']}
-""", posted))
+            process_entry(entry, state, items)
 
         if not latest or not j.get('after'):
             break
 
-        query = urllib.parse.urlencode({
-            'before': latest,
-            'after': j['after'],
-            'limit': 100,
-            'raw_json': 1,
-        })
+        query['after'] = j['after']
+
+    state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
+
+def process_subreddit(subreddit, state, items):
+    latest = state.get(('reddit', 'subreddit', subreddit, 'latest'))
+    new_latest = None
+    last = None
+
+    url = f"https://oauth.reddit.com/r/{subreddit}/new"
+
+    query_dict = {'raw_json': 1}
+
+    if latest:
+        query_dict['before'] = latest
+        query_dict['limit'] = 100
+
+    count = 0
+
+    while True:
+        query = urllib.parse.urlencode(query_dict)
+        url = urllib.parse.urlparse(url)._replace(query=query).geturl()
+
+        json = api_request(state, url)
+
+        j = json['data']
+
+        for child in j['children']:
+            entry = child['data']
+
+            if new_latest is None:
+                new_latest = entry['name']
+
+            process_entry(entry, state, items)
+
+        if not latest or not j.get('after'):
+            break
+
+        query['after'] = j['after']
 
     state['reddit', 'subreddit', subreddit, 'latest'] = new_latest or latest
 
@@ -208,5 +246,11 @@ def process(line, state, items):
         subreddit = rest
 
         process_subreddit(rest, state, items)
+    elif prefix == 'search':
+        kind, rest = rest.split('/', 1)
+        if kind == 'link':
+            process_search_links(rest, state, items)
+        else:
+            raise Exception("unknown search type")
     else:
         raise Exception("unknown prefix")
