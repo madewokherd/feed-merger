@@ -40,7 +40,7 @@ def get_token(user, state, force=False):
         }).encode('utf8')
         try:
             token_response = json.load(urllib.request.urlopen(refresh_url, data=refresh_data))
-        except HTTPError as e:
+        except urllib.error.HTTPError as e:
             if e.code != 401:
                 raise
         else:
@@ -170,7 +170,7 @@ def process(line, state, items):
 
         json_response = api_request(user, state, messages_url)
 
-        if json_response['messages']:
+        if json_response['messages'] and not current_latest:
             current_latest = json_response['messages'][0]['id']
 
         done = False
@@ -178,7 +178,7 @@ def process(line, state, items):
         for m in json_response['messages']:
             id = m['id']
 
-            if prev_latest and id <= prev_latest:
+            if prev_latest and int(id, 16) <= int(prev_latest, 16):
                 done = True
                 break
 
@@ -193,5 +193,5 @@ def process(line, state, items):
 
         messages_query = urllib.parse.urlencode({'q': query, 'pageToken': json_response["nextPageToken"]})
 
-    state['gmail', user, query, 'latest_id'] = current_latest
+    state['gmail', user, query, 'latest_id'] = current_latest or prev_latest
 
