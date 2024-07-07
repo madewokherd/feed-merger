@@ -1,4 +1,5 @@
 import datetime
+from html import escape as e
 
 import feedparser
 
@@ -48,22 +49,26 @@ def process(line, state, items):
 
         if entry.get('content'):
             c = entry.content[0]
-            if 'text/plain' in c:
-                content = '<p>' + e(c).replace('\n', '<br>') + '</p>'
+            if 'text/plain' in c.type:
+                content = '<p>' + e(c.value).replace('\n', '<br>') + '</p>'
             else:
-                content = c
+                content = c.value
         elif entry.get('summary'):
             content = '<p>' + entry.get('summary') + '</p>'
         else:
             content = ''
 
         if 'media_thumbnail' in entry:
-            thumbnail = entry['media_thumbnail']
+            thumbnail = entry['media_thumbnail'][0]
             if 'url' in thumbnail:
                 if 'width' in thumbnail and 'height' in thumbnail:
-                    content = f"""<p><img src="{thumbnail['url']} width="{thumbnail['width']}" height="{thumbnail['height']}"></p>""" + content
+                    width, height = int(thumbnail['width']), int(thumbnail['height'])
+                    if height > 240:
+                        width = int(width * 240 / height)
+                        height = 240
+                    content = f"""<p><img src="{thumbnail['url']}" width="{width}" height="{height}"></p>""" + content
                 else:
-                    content = f"""<p><img src="{thumbnail['url']}></p>""" + content
+                    content = f"""<p><img src="{thumbnail['url']}" height="240"></p>""" + content
 
         items.append((f"""
 
