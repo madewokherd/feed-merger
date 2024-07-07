@@ -177,8 +177,8 @@ def process_search_links(query, state, items):
     count = 0
 
     while True:
-        query = urllib.parse.urlencode(query_dict)
-        url = urllib.parse.urlparse(url)._replace(query=query).geturl()
+        query_str = urllib.parse.urlencode(query_dict)
+        url = urllib.parse.urlparse(url)._replace(query=query_str).geturl()
 
         json = api_request(state, url)
 
@@ -195,7 +195,7 @@ def process_search_links(query, state, items):
         if not latest or not j.get('after'):
             break
 
-        query['after'] = j['after']
+        query_str['after'] = j['after']
 
     state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
 
