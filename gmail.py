@@ -41,7 +41,7 @@ def get_token(user, state, force=False):
         try:
             token_response = json.load(urllib.request.urlopen(refresh_url, data=refresh_data))
         except urllib.error.HTTPError as e:
-            if e.code != 401:
+            if e.code not in (400, 401):
                 raise
         else:
             token = token_response['access_token']
@@ -149,7 +149,7 @@ def api_request(user, state, url, data=None):
         try:
             return json.load(urllib.request.urlopen(req))
         except urllib.error.HTTPError as e:
-            if e.code == 401:
+            if e.code in (400, 401):
                 token = get_token(user, state, True)
                 continue
         else:
