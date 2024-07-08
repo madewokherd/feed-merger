@@ -52,7 +52,17 @@ def fetch_http(url, data=None, headers=None):
     j = {}
     # fill in http fields
     if 'http:headers' not in j:
-        j['http:headers'] = dict(response.headers)
+        headers = {}
+        for key, value in response.getheaders():
+            key = key.lower()
+            if key in headers:
+                if isinstance(headers[key], list):
+                    headers[key].append(value)
+                else:
+                    headers[key] = [headers[key], value]
+            else:
+                headers[key] = value
+        j['http:headers'] = headers
     if 'http:url' not in j:
         j['http:url'] = url
 
@@ -63,8 +73,8 @@ def fill_http_defaults(json):
     if 'fm:base' not in j and 'http:url' in j:
         j['fm:base'] = j['http:url']
 
-    if 'http:headers' in j and "Last-Modified" in j['http:headers']:
-        mtime_iso = email.utils.parsedate_to_datetime(j['http:headers']['Last-Modified']).isoformat()
+    if 'http:headers' in j and "last-modified" in j['http:headers']:
+        mtime_iso = email.utils.parsedate_to_datetime(j['http:headers']['last-modified']).isoformat()
 
         if 'http:mtime_iso' not in j:
             j['http:mtime_iso'] = mtime_iso
