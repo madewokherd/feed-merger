@@ -42,7 +42,91 @@ class HtmlTokenizer(html.parser.HTMLParser):
     def handle_pi(self, data):
         self.tokens.append((PI, data, None))
 
-def handle_html(url, js, state, data, data_str, tokens):
+def handle_mcstories(url, js, state, data, data_str, tokens):
+    import agegate
+    agegate.check(state)
+
+    parsed_url = urllib.parse.urlparse(url)
+    if parsed_url.path.startswith('/Authors/') and 'html:meta:name:dcterms.creator' in js:
+        # Author page
+        js['fm:author'] = js['html:meta:name:dcterms.creator']
+        js['fm:entries'] = entries = []
+
+        prev_latest = state.get(('mcstories', url, 'latest'))
+
+        new_latest = None
+
+        found_any = False
+
+        for i in range(len(tokens)):
+            if tokens[i][0] == STARTTAG and tokens[i][1] == 'tr' and \
+                tokens[i+1][0] == STARTTAG and tokens[i+1][1] == 'td':
+                entry = {}
+                found_any = True
+                entry['fm:author'] = js['fm:author']
+                j = i+2
+                td = 0
+                in_cite = False
+                while not (tokens[j][0] == ENDTAG and tokens[j][1] == 'tr'):
+                    if tokens[j][0] == STARTTAG and tokens[j][1] == 'td':
+                        td += 1
+                    elif tokens[j][0] == STARTTAG and tokens[j][1] == 'a':
+                        entry['fm:link'] = urllib.parse.urljoin(url, dict(tokens[j][2])['href'])
+                    elif tokens[j][0] == STARTTAG and tokens[j][1] == 'cite':
+                        in_cite = True
+                    elif tokens[j][0] == DATA and tokens[j][1].strip():
+                        if td == 0 and in_cite:
+                            entry['fm:title'] = tokens[j][1]
+                            in_cite = False
+                        elif td == 1:
+                            entry['codes'] = tokens[j][1]
+                        elif td == 2:
+                            entry['ctime'] = tokens[j][1]
+                        elif td == 3:
+                            entry['mtime'] = tokens[j][1]
+                    j += 1
+
+                entry_ts = entry.get('mtime', entry['ctime'])
+                entry_ts = datetime.datetime.strptime(entry_ts, '%d %b %Y').isoformat()
+
+                if prev_latest and entry_ts <= prev_latest:
+                    continue
+
+                if not new_latest or new_latest < entry_ts:
+                    new_latest = entry_ts
+
+                entry['fm:timestamp'] = entry_ts
+
+                if prev_latest:
+                    entry_html_json, entry_tokens = fetch_html(entry['fm:link'])
+                    entry['fm:timestamp'] = entry_html_json['http:mtime_iso']
+                    entry['fm:text'] = entry_html_json['html:meta:name:dcterms.description']
+
+                entries.append(entry)
+        
+        if not found_any:
+            raise Exception("Didn't find any stories")
+
+        state['mcstories', url, 'latest'] = new_latest or prev_latest
+        return core.JSON, js
+
+    return core.UNHANDLED, None
+
+html_host_handlers = {
+    'com': {
+        'mcstories': handle_mcstories,
+    }
+}
+
+def find_host_handler(url, host_handlers):
+    for segment in urllib.parse.urlparse(url).hostname.split('.')[::-1]:
+        if segment not in host_handlers:
+            return None
+        host_handlers = host_handlers[segment]
+        if not isinstance(host_handlers, dict):
+            return host_handlers
+
+def handle_html(url, js, state, data, data_str, tokens, use_handlers=True):
     old_charset = js.get('http:charset', 'utf-8')
 
     # look for a charset declaration
@@ -81,6 +165,13 @@ def handle_html(url, js, state, data, data_str, tokens):
                     js['html:title'] = tokens[i+1][1]
             except IndexError:
                 pass
+
+    if use_handlers:
+        host_handler = find_host_handler(url, html_host_handlers)
+        if host_handler:
+            result = host_handler(url, js, state, data, data_str, tokens)
+            if result[0] != core.UNHANDLED:
+                return result
 
     # defaults:
     entry = {}
@@ -135,7 +226,22 @@ mimetype_handlers = {
     'application/xml': handle_sgml,
 }
 
-def fetch_http(url, data=None, headers=None):
+def fetch_html(url, *args, **kwargs):
+    # returns json, tokens
+    js, headers, response = fetch_http(url, *args, **kwargs)
+
+    data = response.read()
+    data_str = data.decode('utf-8', errors='replace')
+    parser = HtmlTokenizer()
+    parser.feed(data_str)
+
+    _disposition, js = handle_html(url, js, {}, data, data_str, parser.tokens, False)
+
+    fill_http_defaults(js)
+
+    return js, parser.tokens
+
+def fetch_http(url, data=None, headers={}):
     # returns json, headers, response
     req = urllib.request.Request(url, data=data, headers=headers)
 

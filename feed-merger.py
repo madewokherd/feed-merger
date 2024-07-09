@@ -268,6 +268,8 @@ def add_defaults(line, j):
             entry['fm:timestamp'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if 'fm:id' not in entry and 'fm:link' in entry:
             entry['fm:id'] = entry['fm:link']
+        if 'fm:text' in entry and 'fm:html' not in entry:
+            entry['fm:html'] = f'<div style="white-space: pre;">{html.escape(entry["fm:text"])}</div>'
         global item_counter
         item_counter += 1
         entry['fm:counter'] = item_counter
