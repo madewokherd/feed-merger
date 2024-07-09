@@ -1,6 +1,7 @@
 import datetime
 import email.utils
 import html.parser
+import urllib.error
 import urllib.request
 
 import core
@@ -137,10 +138,13 @@ mimetype_handlers = {
 def fetch_http(url, data=None, headers=None):
     # returns json, headers, response
     req = urllib.request.Request(url, data=data, headers=headers)
-    response = urllib.request.urlopen(req)
 
-    if response.status == 304:
-        return None, response.headers, response
+    try:
+        response = urllib.request.urlopen(req)
+    except urllib.error.HTTPError as e:
+        if e.code == 304:
+            return None, e.headers, e.fp
+        raise
 
     j = {}
     # fill in http fields
