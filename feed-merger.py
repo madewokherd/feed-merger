@@ -101,6 +101,21 @@ def items_from_json(j, items):
 
             items.append((template_filler.get_contents(), entry['fm:timestamp']))
 
+_BODY_STYLES = {
+    'alink': 'div.styleID a:active { color: VAL; } ',
+    'vlink': 'div.styleID a:visited { color: VAL; } ',
+    'link': 'div.styleID a { color: VAL; } ',
+    'background': 'div.styleID { background: url("VAL"); }',
+    'bgcolor': 'div.styleID { background-color: VAL; }',
+    'bottommargin': 'div.styleID { margin-bottom: VAL; }',
+    'leftmargin': 'div.styleID { margin-left: VAL; }',
+    'topmargin': 'div.styleID { margin-top: VAL; }',
+    'rightmargin': 'div.styleID { margin-right: VAL; }',
+    'text': 'div.styleID { color: VAL; }',
+}
+
+_style_counter = 0
+
 class HtmlTranslator(html.parser.HTMLParser):
     def __init__(self, base):
         super().__init__()
@@ -112,6 +127,8 @@ class HtmlTranslator(html.parser.HTMLParser):
         self.in_divs = 0
 
     def handle_starttag(self, tag, attrs):
+        body_to_div = False
+
         if tag == 'html':
             self.stack.append((self.location, self.output_enabled))
             self.location = 'html'
@@ -127,6 +144,11 @@ class HtmlTranslator(html.parser.HTMLParser):
             self.location = 'body'
             self.output_enabled = True
             tag = 'div'
+            body_to_div = True
+            style_str = []
+            global _style_counter
+            _style_counter += 1
+            style_id = _style_counter
 
         if self.location == 'head' and tag == 'base':
             attrs = dict(attrs)
@@ -151,7 +173,16 @@ class HtmlTranslator(html.parser.HTMLParser):
                     self.strs.append('="')
                     self.strs.append(html.escape(value))
                     self.strs.append('"')
+                    if body_to_div:
+                        if key in _BODY_STYLES:
+                            style_str.append(_BODY_STYLES[key].replace('VAL', value).replace('ID', str(style_id)))
+            if body_to_div and style_str:
+                self.strs.append(f' class="style{style_id}"')
             self.strs.append('>')
+            if body_to_div and style_str:
+                self.strs.append('<style>')
+                self.strs.append(html.escape('\n'.join(style_str)))
+                self.strs.append('</style>')
 
     def handle_endtag(self, tag):
         output_was_enabled = self.output_enabled
@@ -173,7 +204,7 @@ class HtmlTranslator(html.parser.HTMLParser):
 
     def handle_data(self, data):
         if self.output_enabled:
-            self.strs.append(data)
+            self.strs.append(html.escape(data))
 
     def get_contents(self):
         while self.in_divs:
