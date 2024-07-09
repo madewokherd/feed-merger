@@ -88,7 +88,10 @@ def format_body(b, mime_type = 'text/plain'):
     data = base64.urlsafe_b64decode(b['data'] + '=' * (4 - len(b['data']) % 4)).decode(encoding='utf8', errors='replace')
 
     if 'plain' in mime_type:
-        data = '<p>' + data.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>') + '</p>'
+        if data.strip():
+            data = '<p>' + data.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>') + '</p>'
+        else:
+            data = None
     else:
         if '<body' in data:
             data = data.split('<body', 1)[1].split('>', 1)[-1]
