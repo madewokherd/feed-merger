@@ -298,9 +298,13 @@ output_filename = sys.argv[2]
 
 items = []
 
-if output_filename == 'debug':
+try:
+    with open('feed-merger-state') as f:
+        state = eval(f.read())
+except FileNotFoundError:
     state = {}
 
+if output_filename == 'debug':
     line = descfilename
     disposition, data = handle_line(line)
     while disposition == core.REDIRECT:
@@ -324,12 +328,6 @@ if output_filename == 'debug':
     for item in items:
         print(item[1], item[0])
 else:
-    try:
-        with open('feed-merger-state') as f:
-            state = eval(f.read())
-    except FileNotFoundError:
-        state = {}
-
     process_line(descfilename)
 
     items.sort(key = lambda i: i[1])
