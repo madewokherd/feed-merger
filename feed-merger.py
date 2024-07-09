@@ -9,6 +9,7 @@ import os.path
 import readline
 import sys
 import traceback
+import urllib.parse
 
 import core
 
@@ -100,13 +101,90 @@ def items_from_json(j, items):
 
             items.append((template_filler.get_contents(), entry['fm:timestamp']))
 
+class HtmlTranslator(html.parser.HTMLParser):
+    def __init__(self, base):
+        super().__init__()
+        self.strs = []
+        self.stack = []
+        self.base = base
+        self.location = None
+        self.output_enabled = True
+        self.in_divs = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'html':
+            self.stack.append((self.location, self.output_enabled))
+            self.location = 'html'
+            self.output_enabled = False
+            return
+        if tag == 'head':
+            self.stack.append((self.location, self.output_enabled))
+            self.location = 'head'
+            self.output_enabled = False
+            return
+        if tag == 'body':
+            self.stack.append((self.location, self.output_enabled))
+            self.location = 'body'
+            self.output_enabled = True
+            tag = 'div'
+
+        if self.location == 'head' and tag == 'base':
+            attrs = dict(attrs)
+            if 'href' in attrs:
+                self.base = attrs['href']
+            return
+
+        if self.output_enabled:
+            if tag == 'div':
+                self.in_divs += 1
+            if not self.in_divs:
+                self.strs.append('<div>')
+                self.in_divs = 1
+            self.strs.append('<')
+            self.strs.append(tag)
+            for key, value in attrs:
+                if value and key in ('src', 'href'):
+                    value = urllib.parse.urljoin(self.base, value)
+                self.strs.append(' ')
+                self.strs.append(key)
+                if value:
+                    self.strs.append('="')
+                    self.strs.append(html.escape(value))
+                    self.strs.append('"')
+            self.strs.append('>')
+
+    def handle_endtag(self, tag):
+        output_was_enabled = self.output_enabled
+        if tag == self.location:
+            self.location, self.output_enabled = self.stack.pop()
+
+        if tag == 'body':
+            tag = 'div'
+
+        if output_was_enabled:
+            if tag == 'div':
+                if self.in_divs:
+                    self.in_divs -= 1
+                else:
+                    return
+            self.strs.append('</')
+            self.strs.append(tag)
+            self.strs.append('>')
+
+    def handle_data(self, data):
+        if self.output_enabled:
+            self.strs.append(data)
+
+    def get_contents(self):
+        while self.in_divs:
+            self.in_divs -= 1
+            self.strs.append('</div>')
+        return ''.join(self.strs)
+
 def translate_html(feed, entry, data):
-    # FIXME: handle base, tag filtering, and removal of <html> and <head> tags properly
-    if '<body' in data:
-        data = data.split('<body', 1)[1].split('>', 1)[-1]
-    if '</body>' in data:
-        data = data.split('</body>', 1)[0]
-    return data
+    parser = HtmlTranslator(entry.get('fm:base', feed.get('fm:base', '')))
+    parser.feed(data)
+    return parser.get_contents()
 
 def handle_line(line):
     if line.startswith('mastodon:'):
