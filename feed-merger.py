@@ -84,7 +84,7 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
             if not self.output_enabled:
                 return
 
-            self.strs.append(str(eval(f'f"""{rest}"""', locals=self.locals_dict)))
+            self.strs.append(str(eval(f'f"""{rest}"""', globals(), self.locals_dict)))
         else:
             raise Exception(f"template has unknown processing instruction {name}")
 
