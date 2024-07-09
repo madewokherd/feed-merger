@@ -3,6 +3,8 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+import core
+
 from html import escape as e
 
 def get_token(state, force=False):
@@ -101,8 +103,74 @@ def process_branch(line, state, items):
     state['github', 'branch', owner, repo, branchname, 'since'] = recent or since
     state['github', 'branch', owner, repo, branchname, 'since_sha'] = recent_sha or since_sha
 
+def process_issue_search(line, state, items):
+    search_query = line
+
+    query = {
+        'q': search_query,
+        'sort': 'updated',
+        'order': 'desc',
+    }
+
+    since = state.get(('github', 'issue-search', search_query, 'since'))
+
+    if since:
+        query['per_page'] = 100
+
+    recent = None
+
+    page = 1
+
+    result_json = {}
+    entries = result_json['fm:entries'] = []
+
+    finished = False
+
+    while not finished:
+        url = urllib.parse.urlparse('https://api.github.com/search/issues')._replace(
+            query=urllib.parse.urlencode(query)).geturl()
+
+        list_response = api_request(state, url)
+
+        j = json.load(list_response)
+
+        result_json.update(j)
+
+        for item in j['items']:
+            if recent is None:
+                recent = item['updated_at']
+
+            if since and item['updated_at'] <= since:
+                finished = True
+                break
+
+            entry = {}
+            entry.update(item)
+            entry['fm:link'] = entry['html_url']
+            entry['fm:title'] = entry['title']
+            entry['fm:timestamp'] = entry['updated_at']
+            entry['fm:feedname'] = '/'.join(urllib.request.urlparse(entry['html_url']).path.strip('/').split('/')[0:2])
+            entry['fm:author'] = entry['user']['login']
+            entries.append(entry)
+
+        if not since or len(j) < 100:
+            break
+
+        page += 1
+
+        query['page'] = page
+
+    state['github', 'issue-search', search_query, 'since'] = recent or since
+    return core.JSON, result_json
+
 def process(line, state, items):
     prefix, line = line.split(':', 1)
 
     if prefix == 'github-branch':
         process_branch(line, state, items)
+        return core.SUCCESS, None
+
+    if prefix == 'github-issue-search':
+        return process_issue_search(line, state, items)
+
+    raise Exception("unsupported url")

@@ -230,10 +230,9 @@ def handle_line(line):
         import nebula
         nebula.process(line, state, items)
         return core.SUCCESS, None
-    elif line.startswith('github-branch:'):
+    elif line.startswith(('github-branch:', 'github-issue-search')):
         import github
-        github.process(line, state, items)
-        return core.SUCCESS, None
+        return github.process(line, state, items)
     elif line.startswith('gitlab-branch:'):
         import gitlab
         gitlab.process(line, state, items)
