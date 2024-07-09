@@ -73,16 +73,25 @@ def fill_http_defaults(json):
     if 'fm:base' not in j and 'http:url' in j:
         j['fm:base'] = j['http:url']
 
-    if 'http:headers' in j and "last-modified" in j['http:headers']:
-        mtime_iso = email.utils.parsedate_to_datetime(j['http:headers']['last-modified']).isoformat()
+    if 'http:headers' in j:
+        if "last-modified" in j['http:headers']:
+            mtime_iso = email.utils.parsedate_to_datetime(j['http:headers']['last-modified']).isoformat()
 
-        if 'http:mtime_iso' not in j:
-            j['http:mtime_iso'] = mtime_iso
+            if 'http:mtime_iso' not in j:
+                j['http:mtime_iso'] = mtime_iso
 
-        if 'fm:entries' in j:
-            for entry in j['fm:entries']:
-                if 'fm:timestamp' not in entry:
-                    entry['fm:timestamp'] = mtime_iso
+            if 'fm:entries' in j:
+                for entry in j['fm:entries']:
+                    if 'fm:timestamp' not in entry:
+                        entry['fm:timestamp'] = mtime_iso
+        if 'content-type' in j['http:headers']:
+            ct = j['http:headers']['content-type']
+            if not isinstance(ct, list):
+                ct = ct.lower()
+                if 'boundary=' not in ct:
+                    j['http:mimetype'] = ct.split(';', 1)[0]
+                    if 'charset=' in ct:
+                        j['http:charset'] = ct.split('charset=', 1)[1].split(';', 1)[0]
 
     if 'fm:entries' in j and 'http:url' in j:
         for entry in j['fm:entries']:
