@@ -42,6 +42,91 @@ class HtmlTokenizer(html.parser.HTMLParser):
     def handle_pi(self, data):
         self.tokens.append((PI, data, None))
 
+def handle_soundgasm(url, js, state, data, data_str, tokens):
+    import agegate
+    agegate.check(state)
+
+    parsed_url = urllib.parse.urlparse(url)
+    if parsed_url.path.startswith('/u/') and parsed_url.path.strip('/').count('/') == 1:
+        # User page
+        js['fm:author'] = parsed_url.path.strip('/').split('/')[1]
+        js['fm:entries'] = entries = []
+
+        prev_mtime = state.get(('soundgasm', url, 'latest_mtime'))
+        prev_url = state.get(('soundgasm', url, 'latest_url'))
+
+        new_mtime = None
+        new_url = None
+
+        found_any = False
+
+        for i in range(len(tokens)):
+            if tokens[i][0] == STARTTAG and tokens[i][1] == 'div' and dict(tokens[i][2]).get('class') == 'sound-details':
+                entry = {}
+                found_any = True
+                entry['fm:author'] = js['fm:author']
+                j = i + 1
+
+                # parse html data
+                assert tokens[j][0] == STARTTAG and tokens[j][1] == 'a'
+                entry['fm:link'] = urllib.parse.urljoin(url, dict(tokens[j][2])['href'])
+                j += 1
+
+                if entry['fm:link'] == prev_url:
+                    break
+
+                new_url = entry['fm:link']
+
+                assert tokens[j][0] == DATA and tokens[j][1].strip()
+                entry['fm:title'] = tokens[j][1]
+                j += 1
+
+                while not (tokens[j][0] == ENDTAG and tokens[j][1] == 'div'):
+                    if tokens[j][0] == STARTTAG and tokens[j][1] == 'span' and dict(tokens[j][2]).get('class') == 'soundDescription':
+                        j += 1
+                        if tokens[j][0] == DATA:
+                            if tokens[j][1].strip():
+                                entry['fm:text'] = tokens[j][1]
+                            j += 1
+                    elif tokens[j][0] == STARTTAG and tokens[j][1] == 'span' and dict(tokens[j][2]).get('class') == 'playCount':
+                        j += 1
+
+                        assert tokens[j][0] == DATA and tokens[j][1].strip()
+                        entry['play_count'] = int(tokens[j][1].rsplit(' ', 1)[-1])
+                        j += 1
+                    else:
+                        j += 1
+
+                entry_html = urllib.request.urlopen(entry['fm:link']).read().decode('utf-8')
+
+                entry['media_url'] = entry_html.split('            m4a: "', 1)[1].split('"', 1)[0]
+
+                req = urllib.request.Request(entry['media_url'], method='HEAD', headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+                })
+                html_mtime = urllib.request.urlopen(req).headers['Last-Modified']
+                entry['fm:timestamp'] = email.utils.parsedate_to_datetime(html_mtime).isoformat()
+
+                if prev_mtime and entry['fm:timestamp'] <= prev_mtime:
+                    break
+
+                if new_mtime is None:
+                    new_mtime = entry['fm:timestamp']
+
+                entries.append(entry)
+        
+                if not prev_mtime:
+                    break
+
+        if not found_any:
+            raise Exception("Didn't find any uploads")
+
+        state['soundgasm', url, 'latest_mtime'] = new_mtime or prev_mtime
+        state['soundgasm', url, 'latest_url'] = new_url or prev_url
+        return core.JSON, js
+
+    return core.UNHANDLED, None
+
 def handle_mcstories(url, js, state, data, data_str, tokens):
     import agegate
     agegate.check(state)
@@ -103,7 +188,7 @@ def handle_mcstories(url, js, state, data, data_str, tokens):
                     entry['fm:text'] = entry_html_json['html:meta:name:dcterms.description']
 
                 entries.append(entry)
-        
+
         if not found_any:
             raise Exception("Didn't find any stories")
 
@@ -112,10 +197,14 @@ def handle_mcstories(url, js, state, data, data_str, tokens):
 
     return core.UNHANDLED, None
 
+
 html_host_handlers = {
     'com': {
         'mcstories': handle_mcstories,
-    }
+    },
+    'net': {
+        'soundgasm': handle_soundgasm,
+    },
 }
 
 def find_host_handler(url, host_handlers):
