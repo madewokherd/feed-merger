@@ -251,6 +251,18 @@ def handle_line(line):
     elif line.startswith(('http:', 'https:')):
         import web
         return web.process(line, state)
+    elif line.startswith('manual:'):
+        prefix, rest = line.split(':', 1)
+        timestamp, title = rest.split(' ', 1)
+        if timestamp > datetime.datetime.now(datetime.timezone.utc).isoformat():
+            # ignore times in the future
+            return core.SUCCESS, None
+        return core.JSON, {
+            'fm:entries': [{
+                'fm:title': title,
+                'fm:timestamp': timestamp,
+            }]
+        }
     elif line.endswith('.txt'):
         process_file(line)
         return core.SUCCESS, None
