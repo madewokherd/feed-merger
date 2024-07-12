@@ -42,6 +42,9 @@ class HtmlTokenizer(html.parser.HTMLParser):
     def handle_pi(self, data):
         self.tokens.append((PI, data, None))
 
+    def unknown_decl(self, data):
+        self.tokens.append((UNKNOWN, data, None))
+
 def handle_soundgasm(url, js, state, data, data_str, tokens):
     import agegate
     agegate.check(state)
@@ -276,6 +279,89 @@ def handle_html(url, js, state, data, data_str, tokens, use_handlers=True):
 
     return core.JSON, js
 
+def handle_rss(url, js, state, data, data_str, tokens):
+    prev_latest = state.get(('rss', url, 'latest'))
+
+    new_latest = None
+
+    stack = [('', js)] # tagname, dictionary
+
+    # split this into dictionaries
+    for (token_type, token_name, token_data) in tokens:
+        if token_type == STARTTAG and token_name in ('rss', 'channel'):
+            # ignore these tags
+            continue
+
+        if token_type == STARTTAG and token_name == 'item':
+            entry = {}
+            stack.append(('item', entry))
+            if 'fm:entries' not in js:
+                js['fm:entries'] = []
+            js['fm:entries'].append(entry)
+            continue
+
+        if token_type == STARTTAG:
+            stack.append((token_name, dict(token_data)))
+            continue
+
+        if token_type == DATA and token_name.strip():
+            stack[-1][1]['inner'] = token_name
+            continue
+
+        if token_type == UNKNOWN and token_name.startswith('CDATA['):
+            stack[-1][1]['inner'] = token_name[6:]
+            continue
+
+        if token_type == ENDTAG and any(x[0] == token_name for x in stack):
+            while True:
+                old_tag, old_dict = stack.pop()
+
+                if old_tag != 'item':
+                    if len(old_dict) == 1 and 'inner' in old_dict:
+                        val = old_dict['inner']
+                    else:
+                        val = old_dict
+
+                    parent_dict = stack[-1][1]
+
+                    if old_tag in parent_dict:
+                        if isinstance(parent_dict[old_tag], list):
+                            parent_dict[old_tag].append(val)
+                        else:
+                            parent_dict[old_tag] = [parent_dict[old_tag], val]
+                    else:
+                        parent_dict[old_tag] = val
+
+                if old_tag == token_name:
+                    break
+            continue
+
+    for entry in js['fm:entries']:
+        if 'link' in entry:
+            entry['fm:link'] = entry['link']
+        if 'title' in entry:
+            entry['fm:title'] = entry['title']
+        if 'description' in entry:
+            entry['fm:html'] = entry['description']
+        if 'author' in entry:
+            entry['fm:author'] = entry['author']
+        if 'pubdate' in entry:
+            entry['fm:timestamp'] = email.utils.parsedate_to_datetime(entry['pubdate']).isoformat()
+
+    for i in range(len(js['fm:entries']) - 1, -1, -1):
+        entry = js['fm:entries'][i]
+        if 'fm:timestamp' in entry:
+            ts = entry['fm:timestamp']
+            if prev_latest and ts <= prev_latest:
+                js['fm:entries'].pop(i)
+                continue
+            if not new_latest or ts > new_latest:
+                new_latest = ts
+
+    state['rss', url, 'latest'] = new_latest or prev_latest
+
+    return core.JSON, js
+
 def handle_sgml(url, js, state, response):
     data = response.read()
 
@@ -289,16 +375,19 @@ def handle_sgml(url, js, state, response):
         if token_type == DECL:
             tag, rest = tag.split(' ', 1)
             if tag.lower() == 'doctype':
-                if rest.split(' ', 1)[0] == 'html':
+                doctype = rest.split(' ', 1)[0]
+                if doctype == 'html':
                     return handle_html(url, js, state, data, data_str, parser.tokens)
                 else:
                     break
         elif token_type == STARTTAG:
             if tag == 'html':
                 return handle_html(url, js, state, data, data_str, parser.tokens)
+            elif tag == 'rss':
+                return handle_rss(url, js, state, data, data_str, parser.tokens)
             else:
                 break
-        elif token_type == DATA:
+        elif token_type == DATA and tag.strip():
             break
 
     if js.get('http:mimetype') in ('text/html', 'text/xhtml+xml'):
