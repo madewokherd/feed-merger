@@ -341,7 +341,9 @@ def handle_rss(url, js, state, data, data_str, tokens):
             entry['fm:link'] = entry['link']
         if 'title' in entry:
             entry['fm:title'] = entry['title']
-        if 'description' in entry:
+        if 'content:encoded' in entry:
+            entry['fm:html'] = entry['content:encoded']
+        elif 'description' in entry:
             entry['fm:html'] = entry['description']
         if 'author' in entry:
             entry['fm:author'] = entry['author']
