@@ -362,6 +362,105 @@ def handle_rss(url, js, state, data, data_str, tokens):
 
     return core.JSON, js
 
+def handle_atom(url, js, state, data, data_str, tokens):
+    prev_latest = state.get(('atom', url, 'latest'))
+
+    new_latest = None
+
+    stack = [('', js)] # tagname, dictionary
+
+    # split this into dictionaries
+    for (token_type, token_name, token_data) in tokens:
+        if token_type == STARTTAG and token_name in ('atom', 'channel'):
+            # ignore these tags
+            continue
+
+        if token_type == STARTTAG and token_name == 'entry':
+            entry = {}
+            stack.append(('entry', entry))
+            if 'fm:entries' not in js:
+                js['fm:entries'] = []
+            js['fm:entries'].append(entry)
+            continue
+
+        if token_type == STARTTAG:
+            stack.append((token_name, dict(token_data)))
+            continue
+
+        if token_type == DATA and token_name.strip():
+            stack[-1][1]['inner'] = token_name
+            continue
+
+        if token_type == UNKNOWN and token_name.startswith('CDATA['):
+            stack[-1][1]['inner'] = token_name[6:]
+            continue
+
+        if token_type == ENDTAG and any(x[0] == token_name for x in stack):
+            while True:
+                old_tag, old_dict = stack.pop()
+
+                if old_tag != 'item':
+                    if len(old_dict) == 1 and 'inner' in old_dict:
+                        val = old_dict['inner']
+                    else:
+                        val = old_dict
+
+                    parent_dict = stack[-1][1]
+
+                    if old_tag in parent_dict:
+                        if isinstance(parent_dict[old_tag], list):
+                            parent_dict[old_tag].append(val)
+                        else:
+                            parent_dict[old_tag] = [parent_dict[old_tag], val]
+                    else:
+                        parent_dict[old_tag] = val
+
+                if old_tag == token_name:
+                    break
+            continue
+
+    for entry in js['fm:entries'] + [js]:
+        if 'link' in entry:
+            if isinstance(entry['link'], list):
+                for item in entry['link']:
+                    if item.get('rel', 'alternate') == 'alternate':
+                        entry['fm:link'] = entry['link']['href']
+            else:
+                entry['fm:link'] = entry['link']['href']
+        if 'title' in entry:
+            if isinstance(entry['title'], str):
+                entry['fm:title'] = entry['title']
+            elif entry['title'].get('type', 'text') == 'text':
+                entry['fm:title'] = entry['title']['inner']
+            elif entry['title']['type'] == 'html':
+                entry['fm:title'] = html.unescape(entry['title']['inner'])
+        if 'content' in entry or 'summary' in entry:
+            content = entry.get('content', entry.get('summary'))
+            if content.get('type') == 'text':
+                entry['fm:text'] = content.get('inner', '')
+            else:
+                entry['fm:html'] = content.get('inner', '')
+                if 'xml:base' in content and entry is not js:
+                    entry['fm:base'] = content['xml:base']
+        if 'author' in entry and 'name' in entry['author']:
+            entry['fm:author'] = entry['author']['name']
+        if 'updated' in entry:
+            entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry['updated']).astimezone(datetime.timezone.utc).isoformat()
+
+    for i in range(len(js['fm:entries']) - 1, -1, -1):
+        entry = js['fm:entries'][i]
+        if 'fm:timestamp' in entry:
+            ts = entry['fm:timestamp']
+            if prev_latest and ts <= prev_latest:
+                js['fm:entries'].pop(i)
+                continue
+            if not new_latest or ts > new_latest:
+                new_latest = ts
+
+    state['atom', url, 'latest'] = new_latest or prev_latest
+
+    return core.JSON, js
+
 def handle_sgml(url, js, state, response):
     data = response.read()
 
@@ -385,6 +484,8 @@ def handle_sgml(url, js, state, response):
                 return handle_html(url, js, state, data, data_str, parser.tokens)
             elif tag == 'rss':
                 return handle_rss(url, js, state, data, data_str, parser.tokens)
+            elif tag == 'feed':
+                return handle_atom(url, js, state, data, data_str, parser.tokens)
             else:
                 break
         elif token_type == DATA and tag.strip():
@@ -402,6 +503,7 @@ mimetype_handlers = {
     'text/xhtml+xml': handle_sgml,
     'text/xml': handle_sgml,
     'application/xml': handle_sgml,
+    'application/atom+xml': handle_sgml,
 }
 
 def fetch_html(url, *args, **kwargs):
