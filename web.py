@@ -583,6 +583,8 @@ def process(line, state):
     if mtime:
         headers['If-Modified-Since'] = mtime
 
+    headers['User-Agent'] = 'feed-merger/1.0 +https://github.com/madewokherd/feed-merger'
+
     json, headers, response = fetch_http(line, headers=headers)
     if json is None:
         # 304 status
