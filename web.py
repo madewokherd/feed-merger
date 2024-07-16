@@ -444,8 +444,8 @@ def handle_atom(url, js, state, data, data_str, tokens):
                     entry['fm:base'] = content['xml:base']
         if 'author' in entry and 'name' in entry['author']:
             entry['fm:author'] = entry['author']['name']
-        if 'updated' in entry:
-            entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry['updated']).astimezone(datetime.timezone.utc).isoformat()
+        if 'published' in entry or 'updated' in entry:
+            entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
 
     for i in range(len(js['fm:entries']) - 1, -1, -1):
         entry = js['fm:entries'][i]
