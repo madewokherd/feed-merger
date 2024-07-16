@@ -171,12 +171,13 @@ def process_search_links(query, state, items):
     }
 
     if latest:
-        query_dict['before'] = latest
         query_dict['limit'] = 100
 
     count = 0
 
-    while True:
+    stop = False
+
+    while not stop:
         query_str = urllib.parse.urlencode(query_dict)
         url = urllib.parse.urlparse(url)._replace(query=query_str).geturl()
 
@@ -190,12 +191,16 @@ def process_search_links(query, state, items):
             if new_latest is None:
                 new_latest = entry['name']
 
+            if latest and entry['name'] <= latest:
+                stop = True
+                break
+
             process_entry(entry, state, items)
 
         if not latest or not j.get('after'):
             break
 
-        query_str['after'] = j['after']
+        query_dict['after'] = j['after']
 
     state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
 
