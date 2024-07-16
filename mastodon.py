@@ -61,7 +61,7 @@ def format_status(status, status_url):
             content += f"<p>[{a['type']}]</p>"
             content += f"<p><a href=\"{a['url']}\"><img src=\"{a['preview_url']}\"></a></p>"
             if a.get('description'):
-                content += f"<p>Description: {a['description']}</p>"
+                content += f"""<p style="white-space: pre-wrap;">Description: {a['description']}</p>"""
 
     a = status.get('card')
     if a:
