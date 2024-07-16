@@ -446,6 +446,31 @@ def handle_atom(url, js, state, data, data_str, tokens):
             entry['fm:author'] = entry['author']['name']
         if 'published' in entry or 'updated' in entry:
             entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
+        if 'media:group' in entry:
+            group = entry['media:group']
+            if 'media:title' in group and 'fm:title' not in entry:
+                title = group['media:title']
+                if isinstance(title, str):
+                    entry['fm:title'] = title
+                elif title.get('inner'):
+                    if title.get('type', 'plain') == 'plain':
+                        entry['fm:title'] = title['inner']
+                    else:
+                        entry['fm:title'] = html.unescape(title['inner'])
+            if 'media:description' in group and 'fm:text' not in entry and 'fm:html' not in entry:
+                desc = group['media:description']
+                if isinstance(desc, str):
+                    entry['fm:text'] = desc
+                elif desc.get('inner'):
+                    if desc.get('type', 'plain') == 'plain':
+                        entry['fm:text'] = desc['inner']
+                    else:
+                        entry['fm:html'] = desc['inner']
+            if 'media:thumbnail' in group:
+                thumbnail = group['media:thumbnail']
+                if isinstance(thumbnail, list):
+                    thumbnail = thumbnail[0]
+                entry['fm:thumbnail'] = thumbnail['url']
 
     for i in range(len(js['fm:entries']) - 1, -1, -1):
         entry = js['fm:entries'][i]
