@@ -45,6 +45,64 @@ class HtmlTokenizer(html.parser.HTMLParser):
     def unknown_decl(self, data):
         self.tokens.append((UNKNOWN, data, None))
 
+def handle_soundcloud(url, js, state, data, data_str, tokens):
+    if 'html:meta:property:twitter:app:url:googleplay' in js and \
+        js['html:meta:property:twitter:app:url:googleplay'].startswith('soundcloud://users:'):
+        # User page
+        js['fm:author'] = js['html:meta:property:twitter:title']
+        js['fm:entries'] = entries = []
+
+        prev_mtime = state.get(('soundcloud', url, 'latest_mtime'))
+
+        new_mtime = None
+
+        found_any = False
+
+        for i in range(len(tokens)):
+            if tokens[i][0] == STARTTAG and tokens[i][1] == 'article' and dict(tokens[i][2]).get('class') == 'audible':
+                entry = {}
+                found_any = True
+                entry['fm:author'] = js['fm:author']
+                j = i + 1
+
+                while not (tokens[j][0] == ENDTAG and tokens[j][1] == 'article'):
+                    if tokens[j][0] == STARTTAG and tokens[j][1] == 'a' and dict(tokens[j][2]).get('itemprop') == 'url':
+                        entry['fm:link'] = urllib.parse.urljoin(url, dict(tokens[j][2])['href'])
+                        j += 1
+                        if tokens[j][0] == DATA:
+                            entry['fm:title'] = tokens[j][1]
+                            j += 1
+                    elif tokens[j][0] == STARTTAG and tokens[j][1] == 'time' and 'pubdate' in dict(tokens[j][2]):
+                        j += 1
+                        if tokens[j][0] == DATA:
+                            entry['fm:timestamp'] = tokens[j][1]
+                            j += 1
+                    elif tokens[j][0] == STARTTAG and tokens[j][1] == 'meta' and dict(tokens[j][2]).get('itemprop') == 'duration':
+                        entry['duration'] = dict(tokens[j][2]).get('content')
+                        j += 1
+                    else:
+                        j += 1
+
+                if prev_mtime and entry['fm:timestamp'] <= prev_mtime:
+                    continue
+
+                entry_html_json, entry_tokens = fetch_html(entry['fm:link'])
+                entry.update(entry_html_json)
+                entry['fm:text'] = entry_html_json['html:meta:itemprop:description']
+
+                if new_mtime is None or new_mtime < entry['fm:timestamp']:
+                    new_mtime = entry['fm:timestamp']
+
+                entries.append(entry)
+
+        if not found_any:
+            raise Exception("Didn't find any uploads")
+
+        state['soundcloud', url, 'latest_mtime'] = new_mtime or prev_mtime
+        return core.JSON, js
+
+    return core.UNHANDLED, None
+
 def handle_soundgasm(url, js, state, data, data_str, tokens):
     import agegate
     agegate.check(state)
@@ -204,6 +262,7 @@ def handle_mcstories(url, js, state, data, data_str, tokens):
 html_host_handlers = {
     'com': {
         'mcstories': handle_mcstories,
+        'soundcloud': handle_soundcloud,
     },
     'net': {
         'soundgasm': handle_soundgasm,
@@ -251,6 +310,8 @@ def handle_html(url, js, state, data, data_str, tokens, use_handlers=True):
                 js['html:meta:charset'] = attrs['charset']
             elif 'itemprop' in attrs and 'content' in attrs:
                 js[f'html:meta:itemprop:{attrs["itemprop"].lower()}'] = attrs['content']
+            elif 'property' in attrs and 'content' in attrs:
+                js[f'html:meta:property:{attrs["property"].lower()}'] = attrs['content']
         elif tokens[i][0] == STARTTAG and tokens[i][1] == 'title':
             try:
                 if tokens[i+1][0] == DATA:
