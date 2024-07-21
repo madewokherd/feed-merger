@@ -188,6 +188,47 @@ def handle_soundgasm(url, js, state, data, data_str, tokens):
 
     return core.UNHANDLED, None
 
+def handle_ondisneyplus(url, js, state, data, data_str, tokens):
+    entries = []
+    current_entry = {}
+
+    prev_slugs = set(state.get(('ondisneyplus', url, 'slugs'), []))
+
+    for i in range(len(tokens)):
+        if tokens[i][0] == STARTTAG:
+            attrs = dict(tokens[i][2])
+            if tokens[i][1] == 'div' and 'building-block' in attrs.get('class', '').split():
+                if current_entry:
+                    entries.append(current_entry)
+                    current_entry = {}
+            elif tokens[i][1] == 'a' and 'data-anchor-name' in attrs:
+                current_entry['fm:link'] = urllib.parse.urljoin(url, attrs['href'])
+                current_entry['data-slug'] = attrs['data-slug']
+                current_entry['data-anchor-name'] = attrs['data-anchor-name']
+            elif tokens[i][1] == 'img' and 'thumb' in attrs.get('class', '').split() and 'data-src' in attrs:
+                current_entry['fm:thumbnail'] = urllib.parse.urljoin(url, attrs['data-src'])
+                current_entry['fm:title'] = attrs['alt']
+            elif tokens[i][1] == 'p' and attrs.get('class') == 'desc' and tokens[i+1][0] == DATA:
+                current_entry['fm:text'] = tokens[i+1][1]
+
+    if current_entry:
+        entries.append(current_entry)
+
+    if not entries:
+        return core.UNHANDLED, None
+
+    new_slugs = [entry['data-slug'] for entry in entries]
+
+    entries = [entry for entry in entries if entry['data-slug'] not in prev_slugs]
+
+    if not entries:
+        return core.SUCCESS, None
+
+    state['ondisneyplus', url, 'slugs'] = new_slugs
+    js['fm:entries'] = entries
+
+    return core.JSON, js
+
 def handle_mcstories(url, js, state, data, data_str, tokens):
     import agegate
     agegate.check(state)
@@ -261,6 +302,9 @@ def handle_mcstories(url, js, state, data, data_str, tokens):
 
 html_host_handlers = {
     'com': {
+        'disney': {
+            'ondisneyplus': handle_ondisneyplus,
+        },
         'mcstories': handle_mcstories,
         'soundcloud': handle_soundcloud,
     },
