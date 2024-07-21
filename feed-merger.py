@@ -274,7 +274,7 @@ def handle_line(line):
 item_counter = 0
 
 def add_defaults(line, j):
-    for entry in j['fm:entries']:
+    for entry in j.get('fm:entries', ()):
         if 'fm:title' not in entry:
             entry['fm:title'] = line
         if 'fm:timestamp' not in entry:
