@@ -347,6 +347,8 @@ def handle_rss(url, js, state, data, data_str, tokens):
             entry['fm:html'] = entry['description']
         if 'author' in entry:
             entry['fm:author'] = entry['author']
+        elif 'dc:creator' in entry:
+            entry['fm:author'] = entry['dc:creator']
         if 'pubdate' in entry:
             entry['fm:timestamp'] = email.utils.parsedate_to_datetime(entry['pubdate']).isoformat()
 
@@ -421,7 +423,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
                     break
             continue
 
-    for entry in js['fm:entries'] + [js]:
+    for entry in js.get('fm:entries', []) + [js]:
         if 'link' in entry:
             if isinstance(entry['link'], list):
                 for item in entry['link']:
@@ -449,32 +451,32 @@ def handle_atom(url, js, state, data, data_str, tokens):
         if 'published' in entry or 'updated' in entry:
             entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
         if 'media:group' in entry:
-            group = entry['media:group']
-            if 'media:title' in group and 'fm:title' not in entry:
-                title = group['media:title']
-                if isinstance(title, str):
-                    entry['fm:title'] = title
-                elif title.get('inner'):
-                    if title.get('type', 'plain') == 'plain':
-                        entry['fm:title'] = title['inner']
-                    else:
-                        entry['fm:title'] = html.unescape(title['inner'])
-            if 'media:description' in group and 'fm:text' not in entry and 'fm:html' not in entry:
-                desc = group['media:description']
-                if isinstance(desc, str):
-                    entry['fm:text'] = desc
-                elif desc.get('inner'):
-                    if desc.get('type', 'plain') == 'plain':
-                        entry['fm:text'] = desc['inner']
-                    else:
-                        entry['fm:html'] = desc['inner']
-            if 'media:thumbnail' in group:
-                thumbnail = group['media:thumbnail']
-                if isinstance(thumbnail, list):
-                    thumbnail = thumbnail[0]
-                entry['fm:thumbnail'] = thumbnail['url']
+            entry.update(entry['media:group'])
+        if 'media:title' in entry and 'fm:title' not in entry:
+            title = entry['media:title']
+            if isinstance(title, str):
+                entry['fm:title'] = title
+            elif title.get('inner'):
+                if title.get('type', 'plain') == 'plain':
+                    entry['fm:title'] = title['inner']
+                else:
+                    entry['fm:title'] = html.unescape(title['inner'])
+        if 'media:description' in entry and 'fm:text' not in entry and 'fm:html' not in entry:
+            desc = entry['media:description']
+            if isinstance(desc, str):
+                entry['fm:text'] = desc
+            elif desc.get('inner'):
+                if desc.get('type', 'plain') == 'plain':
+                    entry['fm:text'] = desc['inner']
+                else:
+                    entry['fm:html'] = desc['inner']
+        if 'media:thumbnail' in entry:
+            thumbnail = entry['media:thumbnail']
+            if isinstance(thumbnail, list):
+                thumbnail = thumbnail[0]
+            entry['fm:thumbnail'] = thumbnail['url']
 
-    for i in range(len(js['fm:entries']) - 1, -1, -1):
+    for i in range(len(js.get('fm:entries', ())) - 1, -1, -1):
         entry = js['fm:entries'][i]
         if 'fm:timestamp' in entry:
             ts = entry['fm:timestamp']
@@ -531,6 +533,7 @@ mimetype_handlers = {
     'text/xml': handle_sgml,
     'application/xml': handle_sgml,
     'application/atom+xml': handle_sgml,
+    'application/rss+xml': handle_sgml,
 }
 
 def fetch_html(url, *args, **kwargs):
