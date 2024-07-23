@@ -533,7 +533,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
             if isinstance(entry['link'], list):
                 for item in entry['link']:
                     if item.get('rel', 'alternate') == 'alternate':
-                        entry['fm:link'] = entry['link']['href']
+                        entry['fm:link'] = item['href']
             else:
                 entry['fm:link'] = entry['link']['href']
         if 'title' in entry:
