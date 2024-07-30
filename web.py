@@ -384,6 +384,33 @@ def handle_html(url, js, state, data, data_str, tokens, use_handlers=True):
 
     return core.JSON, js
 
+def handle_mrss(entry):
+    if 'media:group' in entry:
+        entry.update(entry['media:group'])
+    if 'media:title' in entry and 'fm:title' not in entry:
+        title = entry['media:title']
+        if isinstance(title, str):
+            entry['fm:title'] = title
+        elif title.get('inner'):
+            if title.get('type', 'plain') == 'plain':
+                entry['fm:title'] = title['inner']
+            else:
+                entry['fm:title'] = html.unescape(title['inner'])
+    if 'media:description' in entry and 'fm:text' not in entry and 'fm:html' not in entry:
+        desc = entry['media:description']
+        if isinstance(desc, str):
+            entry['fm:text'] = desc
+        elif desc.get('inner'):
+            if desc.get('type', 'plain') == 'plain':
+                entry['fm:text'] = desc['inner']
+            else:
+                entry['fm:html'] = desc['inner']
+    if 'media:thumbnail' in entry:
+        thumbnail = entry['media:thumbnail']
+        if isinstance(thumbnail, list):
+            thumbnail = thumbnail[0]
+        entry['fm:thumbnail'] = thumbnail['url']
+
 def handle_rss(url, js, state, data, data_str, tokens):
     prev_latest = state.get(('rss', url, 'latest'))
 
@@ -456,6 +483,7 @@ def handle_rss(url, js, state, data, data_str, tokens):
             entry['fm:author'] = entry['dc:creator']
         if 'pubdate' in entry:
             entry['fm:timestamp'] = email.utils.parsedate_to_datetime(entry['pubdate']).isoformat()
+        handle_mrss(entry)
 
     for i in range(len(js['fm:entries']) - 1, -1, -1):
         entry = js['fm:entries'][i]
@@ -555,31 +583,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
             entry['fm:author'] = entry['author']['name']
         if 'published' in entry or 'updated' in entry:
             entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
-        if 'media:group' in entry:
-            entry.update(entry['media:group'])
-        if 'media:title' in entry and 'fm:title' not in entry:
-            title = entry['media:title']
-            if isinstance(title, str):
-                entry['fm:title'] = title
-            elif title.get('inner'):
-                if title.get('type', 'plain') == 'plain':
-                    entry['fm:title'] = title['inner']
-                else:
-                    entry['fm:title'] = html.unescape(title['inner'])
-        if 'media:description' in entry and 'fm:text' not in entry and 'fm:html' not in entry:
-            desc = entry['media:description']
-            if isinstance(desc, str):
-                entry['fm:text'] = desc
-            elif desc.get('inner'):
-                if desc.get('type', 'plain') == 'plain':
-                    entry['fm:text'] = desc['inner']
-                else:
-                    entry['fm:html'] = desc['inner']
-        if 'media:thumbnail' in entry:
-            thumbnail = entry['media:thumbnail']
-            if isinstance(thumbnail, list):
-                thumbnail = thumbnail[0]
-            entry['fm:thumbnail'] = thumbnail['url']
+        handle_mrss(entry)
 
     for i in range(len(js.get('fm:entries', ())) - 1, -1, -1):
         entry = js['fm:entries'][i]
