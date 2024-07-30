@@ -238,10 +238,6 @@ def handle_line(line):
     elif line.startswith(('gitlab-branch:', 'gitlab-projects:')):
         import gitlab
         return gitlab.process(line, state, items)
-    elif line.startswith('rss:'):
-        import rss
-        rss.process(line, state, items)
-        return core.SUCCESS, None
     elif line.startswith('reddit:'):
         import reddit
         reddit.process(line, state, items)
