@@ -16,7 +16,7 @@ def get_token(url, state, force = False):
     token_pref_url = urllib.parse.urlparse(url)._replace(fragment="", query="", path="/-/user_settings/personal_access_tokens").geturl()
 
     print(f"Please generate a token at {token_pref_url}")
-    print("It should have the read_repository scope")
+    print("It should have the read_api scope")
     token = input("Enter token: ")
 
     state['gitlab', host, 'token'] = token
@@ -41,6 +41,15 @@ def api_request(state, url, data = None):
                 'Authorization': 'Bearer ' + token,
             })
             return urllib.request.urlopen(req)
+        elif e.code == 404:
+            response = input(f"{url} returned 404 error. This could either be because the resource really doesn't exist, or because it's private and you don't have permission to view it. Attempt to log in?[Y/n] ")
+            if response.lower() in ('', 'y', 'yes'):
+                token = get_token(url, state, force = True)
+
+                req = urllib.request.Request(url, data = data, headers = {
+                    'Authorization': 'Bearer ' + token,
+                })
+                return urllib.request.urlopen(req)
         raise
 
 def process_branch(line, state, items):
