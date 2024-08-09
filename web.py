@@ -520,8 +520,47 @@ def handle_atom(url, js, state, data, data_str, tokens):
             js['fm:entries'].append(entry)
             continue
 
+        if 'fm:_inner_xml' in stack[-1][1]:
+            inner = stack[-1][1]['fm:_inner_xml']
+            if token_type == ENDTAG:
+                if token_name == stack[-1][0]:
+                    old_tag, old_dict = stack.pop()
+                    old_dict['inner'] = ''.join(old_dict['fm:_inner_xml'])
+                    del old_dict['fm:_inner_xml']
+
+                    parent_dict = stack[-1][1]
+
+                    if old_tag in parent_dict:
+                        if isinstance(parent_dict[old_tag], list):
+                            parent_dict[old_tag].append(old_dict)
+                        else:
+                            parent_dict[old_tag] = [parent_dict[old_tag], old_dict]
+                    else:
+                        parent_dict[old_tag] = old_dict
+                else:
+                    inner.append('</')
+                    inner.append(token_name)
+                    inner.append('>')
+            elif token_type == STARTTAG:
+                inner.append('<')
+                inner.append(token_name)
+
+                for (key, value) in token_data:
+                    inner.append(' ')
+                    inner.append(key)
+                    inner.append('="')
+                    inner.append(html.escape(value))
+                    inner.append('"')
+
+                inner.append('>')
+            elif token_type == DATA or token_type == UNKNOWN:
+                inner.append(token_name)
+            continue
+
         if token_type == STARTTAG:
             stack.append((token_name, dict(token_data)))
+            if stack[-1][1].get('type') == 'xhtml':
+                stack[-1][1]['fm:_inner_xml'] = []
             continue
 
         if token_type == DATA and token_name.strip():
