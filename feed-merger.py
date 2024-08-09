@@ -235,7 +235,7 @@ def handle_line(line):
     elif line.startswith(('github-branch:', 'github-issue-search')):
         import github
         return github.process(line, state, items)
-    elif line.startswith(('gitlab-branch:', 'gitlab-projects:')):
+    elif line.startswith(('gitlab-branch:', 'gitlab-projects:', 'gitlab-mirror-push-failures:')):
         import gitlab
         return gitlab.process(line, state, items)
     elif line.startswith('reddit:'):

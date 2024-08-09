@@ -173,6 +173,38 @@ def process_projects(line, state, items):
 
     return core.JSON, json_result
 
+def process_mirror_push_failures(line, state, items):
+    host = urllib.parse.urlparse(line)._replace(fragment="", query="", path="").geturl()
+
+    path = urllib.parse.urlparse(line).path
+
+    owner, repo = path.strip('/').split('/')
+
+    project = urllib.parse.quote(f'{owner}/{repo}').replace('/', '%2F')
+
+    # We don't get a timestamp for the last successful update, so we can't really track "new" failures
+
+    json_result = {'fm:entries': []}
+    entries = json_result['fm:entries']
+
+    url = urllib.parse.urlparse(host)._replace(path=f"/api/v4/projects/{project}/remote_mirrors").geturl()
+    j = json.load(api_request(state, url))
+
+    for mirror in j:
+        if not mirror['last_error']:
+            continue
+
+        if mirror['update_status'] == 'finished':
+            continue
+
+        entries.append(mirror)
+        mirror['fm:title'] = f"""Failed to update mirror: {mirror['url']}"""
+        mirror['fm:timestamp'] = mirror['last_update_started_at']
+        mirror['fm:text'] = mirror['last_error']
+        mirror['fm:link'] = line + '/-/settings/repository#js-push-remote-settings'
+
+    return core.JSON, json_result
+
 def process(line, state, items):
     prefix, line = line.split(':', 1)
 
@@ -181,4 +213,6 @@ def process(line, state, items):
         return core.SUCCESS, None
     elif prefix == 'gitlab-projects':
         return process_projects(line, state, items)
+    elif prefix == 'gitlab-mirror-push-failures':
+        return process_mirror_push_failures(line, state, items)
 
