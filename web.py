@@ -468,6 +468,9 @@ def handle_rss(url, js, state, data, data_str, tokens):
                     break
             continue
 
+    if 'title' in js:
+        js['fm:title'] = js['title']
+
     for entry in js['fm:entries']:
         if 'link' in entry:
             entry['fm:link'] = entry['link']
