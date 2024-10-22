@@ -260,6 +260,9 @@ def handle_line(line):
                 'fm:timestamp': timestamp,
             }]
         }
+    elif line.startswith('custom:'):
+        modulename = line.split(':', 2)[1]
+        return __import__(modulename).process(line, state)
     elif line.endswith('.txt'):
         process_file(line)
         return core.SUCCESS, None
