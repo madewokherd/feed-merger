@@ -52,7 +52,7 @@ def format_status(status, status_url):
     if status.get('reblog'):
         content = f"<p>{status['account']['display_name']} reblogged:</p><p><img src=\"{status['reblog']['account']['avatar']}\" width=32 height=32> {status['reblog']['account']['display_name']}</p>{format_status(status['reblog'], status_url)}"
     elif status.get('spoiler_text'):
-        content = f"<p><a href=\"{status_url}\">CW: {status['spoiler_text']}</a></p>"
+        content = f"<details><summary>{html.escape(status['spoiler_text'])}</summary>{status['content']}</details>"
     else:
         content = status['content']
 
