@@ -120,14 +120,14 @@ def format_message(user, m):
 
     body = format_body(p['body'], content_type)
 
-    if not body:
+    if not body and p.get('parts'):
         for part in p['parts']:
             if 'text/html' in part['mimeType'] and part.get('body'):
                 body = format_body(part['body'], part['mimeType'])
             if body:
                 break
 
-    if not body:
+    if not body and p.get('parts'):
         for part in p['parts']:
             if 'text/plain' in part['mimeType'] and part.get('body'):
                 body = format_body(part['body'], part['mimeType'])
