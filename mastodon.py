@@ -1,3 +1,4 @@
+import html
 import json
 import urllib.parse
 import urllib.request
@@ -61,7 +62,7 @@ def format_status(status, status_url):
             content += f"<p>[{a['type']}]</p>"
             content += f"<p><a href=\"{a['url']}\"><img src=\"{a['preview_url']}\"></a></p>"
             if a.get('description'):
-                content += f"""<p style="white-space: pre-wrap;">Description: {a['description']}</p>"""
+                content += f"""<p style="white-space: pre-wrap;">Description: {html.escape(a['description'])}</p>"""
 
     a = status.get('card')
     if a:
@@ -71,7 +72,7 @@ def format_status(status, status_url):
             content += f"<p>[{a.get('provider_name')}] {a.get('title')}</p>"
         content += f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>"
         if a.get('description'):
-            content += f"<p>Description: {a['description']}</p>"
+            content += f"<p>Description: {html.escape(a['description'])}</p>"
 
     return content
 
