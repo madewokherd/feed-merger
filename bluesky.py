@@ -95,12 +95,40 @@ def post_to_html(entry, doc, line, state):
     return '\n'.join(html_parts)
 
 def translate_entry(entry, doc, line, state):
-    post = entry['post']
-    entry['fm:link'] = uri_to_https(post['uri'])
-    entry['fm:author'] = post['author']['display_name']
-    entry['fm:avatar'] = post['author']['avatar']
-    entry['fm:timestamp'] = post['record']['created_at']
-    entry['fm:html'] = post_to_html(entry, doc, line, state)
+    if entry['py_type'] == 'app.bsky.feed.defs#feedViewPost':
+        post = entry['post']
+        entry['fm:link'] = uri_to_https(post['uri'])
+        entry['fm:author'] = post['author']['display_name']
+        entry['fm:avatar'] = post['author']['avatar']
+        entry['fm:timestamp'] = post['record']['created_at']
+        entry['fm:html'] = post_to_html(entry, doc, line, state)
+    elif entry['py_type'] == 'app.bsky.notification.listNotifications#notification':
+        entry['fm:author'] = entry['author']['display_name']
+        entry['fm:avatar'] = entry['author']['avatar']
+        entry['fm:timestamp'] = entry['indexed_at']
+        reason = entry['reason']
+        if reason == 'follow':
+            entry['fm:title'] = "Followed you"
+        elif reason == 'like':
+            entry['fm:title'] = "Liked your post"
+        elif reason == 'repost':
+            entry['fm:title'] = "Reposted your post"
+        elif reason == 'mention':
+            entry['fm:title'] = "Mentioned you"
+        elif reason == 'reply':
+            entry['fm:title'] = "Replied to your post"
+        elif reason == 'quote':
+            entry['fm:title'] = "Quoted your post"
+        else:
+            entry['fm:title'] = f"Bluesky notification: {reason}"
+        if entry.get('reason_subject'):
+            entry['fm:link'] = uri_to_https(entry['reason_subject'])
+        else:
+            entry['fm:link'] = f'https://bsky.app/profile/{entry['author']['handle']}'
+        #if entry.get('record'): # none of these have enough information to display, and I don't want to make an extra query
+        #    entry['fm:html'] = post_to_html(entry['record'], doc, line, state)
+    else:
+        print(f"Unknown bluesky entry type: {entry['py_type']}")
 
 def process_timeline(line, state):
     client = get_client(state)
@@ -133,7 +161,39 @@ def process_timeline(line, state):
 
     return core.JSON, j
 
+def process_notifications(line, state):
+    client = get_client(state)
+
+    prev_last_indexed = state.get(('bluesky-notifications', 'last_indexed'))
+    new_last_indexed = None
+
+    j = to_json(client.app.bsky.notification.list_notifications())
+
+    if j.get('notifications'):
+        new_last_indexed = j['notifications'][0]['indexed_at']
+
+        if prev_last_indexed:
+            response = j
+            while j['notifications'][0]['indexed_at'] > prev_last_indexed and 'cursor' in response:
+                response = client.app.bsky.notification.list_notifications(cursor = response['cursor'])
+                if response['notifications']:
+                    j['notifications'].extend(response['notifications'])
+                else:
+                    break
+            while j['notifications'] and j['notifications'][-1]['indexed_at'] <= prev_last_indexed:
+                j['notifications'].pop(-1)
+
+    j['fm:entries'] = j['notifications']
+    for entry in j['fm:entries']:
+        translate_entry(entry, j, line, state)
+
+    state['bluesky-notifications', 'last_indexed'] = new_last_indexed
+
+    return core.JSON, j
+
 def process(line, state):
     if line.startswith('bluesky:'):
         return process_timeline(line, state)
+    elif line.startswith('bluesky-notifications:'):
+        return process_notifications(line, state)
 
