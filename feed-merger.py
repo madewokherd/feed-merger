@@ -13,7 +13,7 @@ import urllib.parse
 
 import core
 
-entry_template = """<h1><a name="item{e['fm:counter']}"></a><?if e.get('fm:link')><a href="{e['fm:link']}"><?endif>{' - '.join(x for x in (e.get('fm:feedname') or f.get('fm:title'), e.get('fm:author'), e.get('fm:title')) if x)}<?if e.get('fm:link')></a><?endif> {e['fm:timestamp']} <a href="#item{e['fm:counter']}">[anchor]</a></h1>
+entry_template = """<h1><a name="item{e['fm:counter']}"></a><?if e.get('fm:link')><a href="{e['fm:link']}"><?endif><?if e.get('fm:avatar')><img src="{e['fm:avatar']}" width=48 height=48><?endif>{' - '.join(x for x in (e.get('fm:feedname') or f.get('fm:title'), e.get('fm:author'), e.get('fm:title')) if x)}<?if e.get('fm:link')></a><?endif> {e['fm:timestamp']} <a href="#item{e['fm:counter']}">[anchor]</a></h1>
 
 <?html <!-->
 <?html {json.dumps(e, indent=2).replace('--' + chr(62), '--\\\\' + chr(62))}>

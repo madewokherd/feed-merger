@@ -1,4 +1,5 @@
 import getpass
+import html
 import urllib.parse
 
 import atproto
@@ -39,21 +40,67 @@ def to_json(obj):
         result[key] = to_json(result[key])
     return result
 
-def translate_entry(entry, doc, line, state):
-    post = entry['post']
-    parse = urllib.parse.urlparse(post['uri'])
+def uri_to_https(uri):
+    parse = urllib.parse.urlparse(uri)
     if parse.scheme != 'at':
-        entry['fm:link'] = post['uri']
+        return 'uri'
     else:
         did = parse.netloc
         collection, rkey = parse.path.lstrip('/').split('/', 1)
         if collection == 'app.bsky.feed.post':
-            entry['fm:link'] = f'https://bsky.app/profile/{did}/post/{rkey}'
+            return f'https://bsky.app/profile/{did}/post/{rkey}'
         else:
-            entry['fm:link'] = post['uri']
+            return 'uri'
+
+def post_to_html(entry, doc, line, state):
+    html_parts = []
+
+    if entry['py_type'] == 'app.bsky.feed.defs#feedViewPost':
+        if entry.get('reason'):
+            reason = entry['reason']['py_type']
+            if reason == 'app.bsky.feed.defs#reasonRepost':
+                entry['fm:timestamp'] = entry['reason']['indexed_at']
+                html_parts.append(f'''<p><img src="{entry['reason']['by']['avatar']}" width=32 height=32> {html.escape(entry['reason']['by']['display_name'])} reposted:</p>''')
+
+        if entry.get('reply'):
+            html_parts.append(f'''<details><summary><a href="{uri_to_https(entry['reply']['parent']['uri'])}">In reply to</a> <img src="{entry['reply']['parent']['author']['avatar']}" width=16 height=16> {html.escape(entry['reply']['parent']['author']['display_name'])}</summary><blockquote>{post_to_html(entry['reply']['parent'], doc, line, state)}</blockquote></details>''')
+
+        if entry.get('post'):
+            html_parts.append(post_to_html(entry['post'], doc, line, state))
+    elif entry['py_type'] == 'app.bsky.feed.defs#postView':
+        if entry.get('record'):
+            html_parts.append(post_to_html(entry['record'], doc, line, state))
+
+        if entry.get('embed'):
+            if entry['embed'].get('images'):
+                for image in entry['embed']['images']:
+                    html_parts.append(f'''<p><a href="{image['fullsize']}"><img src="{image['thumb']}"></a></p>''')
+
+                    if image.get('alt'):
+                        html_parts.append(f'''<p style="white-space: pre-wrap;">Image description: {html.escape(image['alt'])}</p>''')
+
+            if entry['embed'].get('record'):
+                record = entry['embed']['record']
+                html_parts.append(f'''<p><a href="{uri_to_https(record['uri'])}">Embedded post</a> by <img src="{record['author']['avatar']}" width=32 height=32> {html.escape(record['author']['display_name'])}</p>''')
+                html_parts.append(f'''<blockquote style="white-space: pre-wrap;">{post_to_html(record, doc, line, state)}</blockquote>''')
+    elif entry['py_type'] == 'app.bsky.feed.post':
+        if entry.get('text'):
+            html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['text'])}</p>''')
+    elif entry['py_type'] == 'app.bsky.embed.record#viewRecord':
+        if entry.get('value'):
+            html_parts.append(post_to_html(entry['value'], doc, line, state))
+    else:
+        print(f"Unknown bluesky object type: {entry['py_type']}")
+
+    return '\n'.join(html_parts)
+
+def translate_entry(entry, doc, line, state):
+    post = entry['post']
+    entry['fm:link'] = uri_to_https(post['uri'])
     entry['fm:author'] = post['author']['display_name']
+    entry['fm:avatar'] = post['author']['avatar']
     entry['fm:timestamp'] = post['record']['created_at']
-    entry['fm:text'] = post['record']['text']
+    entry['fm:html'] = post_to_html(entry, doc, line, state)
 
 def process_timeline(line, state):
     client = get_client(state)
