@@ -126,16 +126,7 @@ def process(line, state):
         if new_since_id is None and json_response:
             new_since_id = json_response[0]['id']
 
-        for item in json_response:
-            jsonstr = json.dumps(item).lower()
-
-            if matching and not any(x for x in matching if x in jsonstr):
-                continue
-
-            if nonmatching and any(x for x in nonmatching if x in jsonstr):
-                continue
-
-            j['fm:entries'].append(item)
+        j['fm:entries'].extend(json_response)
 
         if since_id and len(json_response) == 40:
             query_dict['max_id'] = json_response[-1]['id']
