@@ -50,12 +50,16 @@ def get_token(server_url, state):
 
     return token
 
-def format_status(status, reblog_author):
+def format_status(status, link, reblog_author):
     html_parts = []
     html_end_parts = []
 
     if reblog_author:
         html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {reblog_author['display_name']} boosted:</p>")
+
+    if status.get('in_reply_to_id'):
+        reply_link = urllib.parse.urlparse(link)._replace(fragment="", query="", path=f"/web/statuses/{status['in_reply_to_id']}").geturl()
+        html_parts.append(f"<p><img src=\"{status['account']['avatar']}\" width=16 height=16> {status['account']['display_name']} replied to <a href=\"{reply_link}\">a post</a></p>")
 
     if status.get('spoiler_text'):
         html_parts.append(f"<details><summary>{html.escape(status['spoiler_text'])}</summary>")
@@ -147,7 +151,7 @@ def process(line, state):
         item['fm:title'] = main_item['account']['acct']
         item['fm:timestamp'] = item['created_at']
 
-        item['fm:html'] = format_status(main_item, reblog_author)
+        item['fm:html'] = format_status(main_item, item['fm:link'], reblog_author)
 
     if new_since_id:
         state[('mastodon', timeline_url, timeline_key, 'since_id')] = new_since_id
