@@ -226,8 +226,7 @@ def translate_html(feed, entry, data):
 def handle_line(line):
     if line.startswith('mastodon:'):
         import mastodon
-        mastodon.process(line, state, items)
-        return core.SUCCESS, None
+        return mastodon.process(line, state)
     elif line.startswith('gmail:'):
         import gmail
         gmail.process(line, state, items)

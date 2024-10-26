@@ -3,6 +3,8 @@ import json
 import urllib.parse
 import urllib.request
 
+import core
+
 def get_token(server_url, state):
     if ('mastodon', server_url, 'token') in state:
         return state[('mastodon', server_url, 'token')]
@@ -76,7 +78,7 @@ def format_status(status, status_url):
 
     return content
 
-def process(line, state, items):
+def process(line, state):
     line = line.split(':', 1)[1] #remove mastodon:
     parse = urllib.parse.urlparse(line)
     server_url = parse._replace(fragment="", query="", path="").geturl()
@@ -84,6 +86,7 @@ def process(line, state, items):
     timeline_url = timeline_parse.geturl()
     query_dict = urllib.parse.parse_qs(parse.query)
     token = get_token(server_url, state)
+    j = {'fm:entries': []}
 
     matching = None
     nonmatching = None
@@ -116,32 +119,36 @@ def process(line, state, items):
             new_since_id = json_response[0]['id']
 
         for item in json_response:
-            if item.get('reblog'):
-                status_url = parse._replace(fragment="", query="", path=f"/web/statuses/{item['reblog']['id']}").geturl()
-            else:
-                status_url = parse._replace(fragment="", query="", path=f"/web/statuses/{item['id']}").geturl()
+            jsonstr = json.dumps(item).lower()
 
-            content = format_status(item, status_url)
-
-            if matching and not any(x for x in matching if x in content.lower()):
+            if matching and not any(x for x in matching if x in jsonstr):
                 continue
 
-            if nonmatching and any(x for x in nonmatching if x in content.lower()):
+            if nonmatching and any(x for x in nonmatching if x in jsonstr):
                 continue
 
-            items.append((f"""
-
-<h1><a href="{status_url}"><img src="{item['account']['avatar']}" width=48 height=48> {item['account']['display_name']} [{item['account']['acct']}] at {item['created_at']} </a><a name="{item['id']}" href="#{item['id']}">[anchor]</a></h1>
-
-{content}
-
-""", item['created_at']))
+            j['fm:entries'].append(item)
 
         if since_id and len(json_response) == 40:
             query_dict['max_id'] = json_response[-1]['id']
         else:
             break
 
+    for item in j['fm:entries']:
+        if item.get('reblog'):
+            item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{item['reblog']['id']}").geturl()
+        else:
+            item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{item['id']}").geturl()
+
+        item['fm:avatar'] = item['account']['avatar']
+        item['fm:author'] = item['account']['display_name']
+        item['fm:title'] = item['account']['acct']
+        item['fm:timestamp'] = item['created_at']
+
+        item['fm:html'] = format_status(item, item['fm:link'])
+
     if new_since_id:
         state[('mastodon', timeline_url, timeline_key, 'since_id')] = new_since_id
+
+    return core.JSON, j
 
