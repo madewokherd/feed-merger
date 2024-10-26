@@ -50,33 +50,41 @@ def get_token(server_url, state):
 
     return token
 
-def format_status(status, status_url):
-    if status.get('reblog'):
-        content = f"<p>{status['account']['display_name']} reblogged:</p><p><img src=\"{status['reblog']['account']['avatar']}\" width=32 height=32> {status['reblog']['account']['display_name']}</p>{format_status(status['reblog'], status_url)}"
-    elif status.get('spoiler_text'):
-        content = f"<details><summary>{html.escape(status['spoiler_text'])}</summary>{status['content']}</details>"
-    else:
-        content = status['content']
+def format_status(status, reblog_author):
+    html_parts = []
+    html_end_parts = []
+
+    if reblog_author:
+        html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {reblog_author['display_name']} reblogged:</p>")
+
+    if status.get('spoiler_text'):
+        html_parts.append(f"<details><summary>{html.escape(status['spoiler_text'])}</summary>")
+        html_end_parts.append("</details>")
+
+    html_parts.append(status['content'])
 
     media_attachments = status.get('media_attachments')
     if media_attachments:
         for a in media_attachments:
-            content += f"<p>[{a['type']}]</p>"
-            content += f"<p><a href=\"{a['url']}\"><img src=\"{a['preview_url']}\"></a></p>"
+            html_parts.append(f"<p>[{a['type']}]</p>")
+            html_parts.append(f"<p><a href=\"{a['url']}\"><img src=\"{a['preview_url']}\"></a></p>")
             if a.get('description'):
-                content += f"""<p style="white-space: pre-wrap;">Description: {html.escape(a['description'])}</p>"""
+                html_parts.append(f"""<p style="white-space: pre-wrap;">Description: {html.escape(a['description'])}</p>""")
 
     a = status.get('card')
     if a:
         if a.get('author_name'):
-            content += f"<p>[{a.get('provider_name')}] {a['author_name']} - {a.get('title')}</p>"
+            html_parts.append(f"<p>[{a.get('provider_name')}] {a['author_name']} - {a.get('title')}</p>")
         else:
-            content += f"<p>[{a.get('provider_name')}] {a.get('title')}</p>"
-        content += f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>"
+            html_parts.append(f"<p>[{a.get('provider_name')}] {a.get('title')}</p>")
+        html_parts.append(f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>")
         if a.get('description'):
-            content += f"<p>Description: {html.escape(a['description'])}</p>"
+            html_parts.append(f"<p>Description: {html.escape(a['description'])}</p>")
 
-    return content
+    html_end_parts.reverse()
+    html_parts.extend(html_end_parts)
+
+    return '\n'.join(html_parts)
 
 def process(line, state):
     line = line.split(':', 1)[1] #remove mastodon:
@@ -136,16 +144,19 @@ def process(line, state):
 
     for item in j['fm:entries']:
         if item.get('reblog'):
-            item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{item['reblog']['id']}").geturl()
+            main_item = item['reblog']
+            reblog_author = item['account']
         else:
-            item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{item['id']}").geturl()
+            main_item = item
+            reblog_author = None
 
-        item['fm:avatar'] = item['account']['avatar']
-        item['fm:author'] = item['account']['display_name']
-        item['fm:title'] = item['account']['acct']
+        item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{main_item['id']}").geturl()
+        item['fm:avatar'] = main_item['account']['avatar']
+        item['fm:author'] = main_item['account']['display_name']
+        item['fm:title'] = main_item['account']['acct']
         item['fm:timestamp'] = item['created_at']
 
-        item['fm:html'] = format_status(item, item['fm:link'])
+        item['fm:html'] = format_status(main_item, reblog_author)
 
     if new_since_id:
         state[('mastodon', timeline_url, timeline_key, 'since_id')] = new_since_id
