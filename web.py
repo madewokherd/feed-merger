@@ -476,6 +476,8 @@ def handle_rss(url, js, state, data, data_str, tokens):
     for entry in js['fm:entries']:
         if 'link' in entry:
             entry['fm:link'] = entry['link']
+        elif 'enclosure' in entry and 'url' in entry['enclosure']:
+            entry['fm:link'] = entry['enclosure']['url']
         if 'title' in entry:
             entry['fm:title'] = entry['title']
         if 'content:encoded' in entry:
