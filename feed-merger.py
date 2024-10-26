@@ -283,6 +283,7 @@ item_counter = 0
 
 def add_defaults(line, j):
     for entry in j.get('fm:entries', ()):
+        entry['fm:source'] = line
         if 'fm:title' not in entry:
             entry['fm:title'] = line
         if 'fm:timestamp' not in entry:
