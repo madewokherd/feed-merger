@@ -55,7 +55,7 @@ def format_status(status, reblog_author):
     html_end_parts = []
 
     if reblog_author:
-        html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {reblog_author['display_name']} reblogged:</p>")
+        html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {reblog_author['display_name']} boosted:</p>")
 
     if status.get('spoiler_text'):
         html_parts.append(f"<details><summary>{html.escape(status['spoiler_text'])}</summary>")
