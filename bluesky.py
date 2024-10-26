@@ -60,35 +60,54 @@ def post_to_html(entry, doc, line, state):
             reason = entry['reason']['py_type']
             if reason == 'app.bsky.feed.defs#reasonRepost':
                 entry['fm:timestamp'] = entry['reason']['indexed_at']
-                html_parts.append(f'''<p><img src="{entry['reason']['by']['avatar']}" width=32 height=32> {html.escape(entry['reason']['by']['display_name'])} reposted:</p>''')
+                html_parts.append(f'''<p><img src="{entry['reason']['by']['avatar']}" width=16 height=16> {html.escape(entry['reason']['by']['display_name'])} reposted:</p>''')
 
         if entry.get('reply'):
             html_parts.append(f'''<details><summary><a href="{uri_to_https(entry['reply']['parent']['uri'])}">In reply to</a> <img src="{entry['reply']['parent']['author']['avatar']}" width=16 height=16> {html.escape(entry['reply']['parent']['author']['display_name'])}</summary><blockquote>{post_to_html(entry['reply']['parent'], doc, line, state)}</blockquote></details>''')
 
         if entry.get('post'):
             html_parts.append(post_to_html(entry['post'], doc, line, state))
+
+        if entry.get('labels'):
+            for label in labels:
+                if label.get('val') in ('sexual',):
+                    html_parts.insert(0, f'''<details><summary>{label['val']}</summary>''')
+                    html_parts.append('</details>')
+                    break
     elif entry['py_type'] == 'app.bsky.feed.defs#postView':
         if entry.get('record'):
             html_parts.append(post_to_html(entry['record'], doc, line, state))
 
         if entry.get('embed'):
-            if entry['embed'].get('images'):
-                for image in entry['embed']['images']:
-                    html_parts.append(f'''<p><a href="{image['fullsize']}"><img src="{image['thumb']}"></a></p>''')
-
-                    if image.get('alt'):
-                        html_parts.append(f'''<p style="white-space: pre-wrap;">Image description: {html.escape(image['alt'])}</p>''')
-
-            if entry['embed'].get('record'):
-                record = entry['embed']['record']
-                html_parts.append(f'''<p><a href="{uri_to_https(record['uri'])}">Embedded post</a> by <img src="{record['author']['avatar']}" width=32 height=32> {html.escape(record['author']['display_name'])}</p>''')
-                html_parts.append(f'''<blockquote style="white-space: pre-wrap;">{post_to_html(record, doc, line, state)}</blockquote>''')
+            html_parts.append(post_to_html(entry['embed'], doc, line, state))
     elif entry['py_type'] == 'app.bsky.feed.post':
         if entry.get('text'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['text'])}</p>''')
     elif entry['py_type'] == 'app.bsky.embed.record#viewRecord':
         if entry.get('value'):
-            html_parts.append(post_to_html(entry['value'], doc, line, state))
+            html_parts.append(f'''<p><a href="{uri_to_https(entry['uri'])}">Embedded post</a> by <img src="{entry['author']['avatar']}" width=32 height=32> {html.escape(entry['author']['display_name'])}</p>''')
+            html_parts.append(f'''<blockquote style="white-space: pre-wrap;">{post_to_html(entry['value'], doc, line, state)}</blockquote>''')
+    elif entry['py_type'] == 'app.bsky.embed.images#view':
+        for image in entry['images']:
+            html_parts.append(post_to_html(image, doc, line, state))
+    elif entry['py_type'] == 'app.bsky.embed.images#viewImage':
+        html_parts.append(f'''<p><a href="{entry['fullsize']}"><img src="{entry['thumb']}"></a></p>''')
+
+        if entry.get('alt'):
+            html_parts.append(f'''<p style="white-space: pre-wrap;">Image description: {html.escape(entry['alt'])}</p>''')
+    elif entry['py_type'] == 'app.bsky.embed.record#view':
+        html_parts.append(post_to_html(entry['record'], doc, line, state))
+    elif entry['py_type'] == 'app.bsky.embed.external#view':
+        html_parts.append(post_to_html(entry['external'], doc, line, state))
+    elif entry['py_type'] == 'app.bsky.embed.external#viewExternal':
+        html_parts.append(f'''<p><a href="entry['uri']">{html.escape(entry.get('title', 'Link embed:'))}</a></p>''')
+        if entry.get('thumb'):
+            html_parts.append(f'''<p><img src="{entry['thumb']}"></p>''')
+        if entry.get('description'):
+            html_parts.append(f'''<p style="white-space: pre-wrap;">Description: {html.escape(entry['description'])}</p>''')
+    elif entry['py_type'] == 'app.bsky.embed.recordWithMedia#view':
+        html_parts.append(post_to_html(entry['record'], doc, line, state))
+        html_parts.append(post_to_html(entry['media'], doc, line, state))
     else:
         print(f"Unknown bluesky object type: {entry['py_type']}")
 
@@ -143,10 +162,10 @@ def process_timeline(line, state):
 
         if prev_last_indexed:
             response = j
-            while j['feed'][-1]['post']['indexed_at'] > prev_last_indexed and 'cursor' in response:
+            while j['feed'][-1]['post']['indexed_at'] > prev_last_indexed and response.get('cursor'):
                 response = client.get_timeline(cursor = response['cursor'])
                 if response['feed']:
-                    j['feed'].extend(response['feed'])
+                    j['feed'].extend(to_json(response['feed']))
                 else:
                     break
             while j['feed'] and j['feed'][-1]['post']['indexed_at'] <= prev_last_indexed:
@@ -174,10 +193,10 @@ def process_notifications(line, state):
 
         if prev_last_indexed:
             response = j
-            while j['notifications'][0]['indexed_at'] > prev_last_indexed and 'cursor' in response:
+            while j['notifications'][0]['indexed_at'] > prev_last_indexed and response.get('cursor'):
                 response = client.app.bsky.notification.list_notifications(cursor = response['cursor'])
                 if response['notifications']:
-                    j['notifications'].extend(response['notifications'])
+                    j['notifications'].extend(to_json(response['notifications']))
                 else:
                     break
             while j['notifications'] and j['notifications'][-1]['indexed_at'] <= prev_last_indexed:
