@@ -50,16 +50,19 @@ def get_token(server_url, state):
 
     return token
 
+def account_name(account):
+    return account.get('display_name') or account.get('username') or ''
+
 def format_status(status, link, reblog_author):
     html_parts = []
     html_end_parts = []
 
     if reblog_author:
-        html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {reblog_author['display_name']} boosted:</p>")
+        html_parts.append(f"<p><img src=\"{reblog_author['avatar']}\" width=16 height=16> {account_name(reblog_author)} boosted:</p>")
 
     if status.get('in_reply_to_id'):
         reply_link = urllib.parse.urlparse(link)._replace(fragment="", query="", path=f"/web/statuses/{status['in_reply_to_id']}").geturl()
-        html_parts.append(f"<p><img src=\"{status['account']['avatar']}\" width=16 height=16> {status['account']['display_name']} replied to <a href=\"{reply_link}\">a post</a></p>")
+        html_parts.append(f"<p><img src=\"{status['account']['avatar']}\" width=16 height=16> {account_name(status['account'])} replied to <a href=\"{reply_link}\">a post</a></p>")
 
     if status.get('spoiler_text'):
         html_parts.append(f"<details><summary>{html.escape(status['spoiler_text'])}</summary>")
@@ -147,7 +150,7 @@ def process(line, state):
 
         item['fm:link'] = parse._replace(fragment="", query="", path=f"/web/statuses/{main_item['id']}").geturl()
         item['fm:avatar'] = main_item['account']['avatar']
-        item['fm:author'] = main_item['account']['display_name']
+        item['fm:author'] = account_name(main_item['account'])
         item['fm:title'] = main_item['account']['acct']
         item['fm:timestamp'] = item['created_at']
 
