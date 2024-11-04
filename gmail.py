@@ -6,6 +6,7 @@ import urllib.parse
 import urllib.request
 
 import core
+import fm_email
 
 def get_client_credentials(state):
     if ('gmail', 'client_credentials') in state:
@@ -83,58 +84,6 @@ def get_token(user, state, force=False):
 
     return token
 
-def format_body(b, mime_type = 'text/plain'):
-    if 'data' not in b:
-        return None
-
-    data = base64.urlsafe_b64decode(b['data'] + '=' * (4 - len(b['data']) % 4)).decode(encoding='utf8', errors='replace')
-
-    if 'plain' in mime_type:
-        if data.strip():
-            data = '<p>' + data.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>') + '</p>'
-        else:
-            data = None
-    else:
-        if '<body' in data:
-            data = data.split('<body', 1)[1].split('>', 1)[-1]
-        if '</body>' in data:
-            data = data.split('</body>', 1)[0]
-
-    return data
-
-def format_message(user, m):
-    p = m['payload']
-
-    content_type = 'text/plain'
-
-    for h in p['headers']:
-        if h['name'] == 'From':
-            m['fm:author'] = h['value']
-        elif h['name'] == 'Subject':
-            m['fm:title'] = h['value']
-        elif h['name'] == 'Content-Type':
-            content_type = h['value']
-
-    body = format_body(p['body'], content_type)
-
-    if not body and p.get('parts'):
-        for part in p['parts']:
-            if 'text/html' in part['mimeType'] and part.get('body'):
-                body = format_body(part['body'], part['mimeType'])
-            if body:
-                break
-
-    if not body and p.get('parts'):
-        for part in p['parts']:
-            if 'text/plain' in part['mimeType'] and part.get('body'):
-                body = format_body(part['body'], part['mimeType'])
-            if body:
-                break
-
-    m['fm:html'] = body
-
-    m['fm:link'] = f"https://mail.google.com/mail/u/{user}/?view=pt&search=all&permmsgid=msg-f:{int(m['id'], 16)}"
-
 def api_request(user, state, url, data=None):
     token = get_token(user, state)
 
@@ -183,7 +132,7 @@ def process(line, state):
                 done = True
                 break
 
-            message_url = f"https://gmail.googleapis.com/gmail/v1/users/{user}/messages/{id}?format=full"
+            message_url = f"https://gmail.googleapis.com/gmail/v1/users/{user}/messages/{id}?format=raw"
 
             m = api_request(user, state, message_url)
 
@@ -196,7 +145,9 @@ def process(line, state):
 
     for entry in entries:
         entry['fm:timestamp'] = datetime.datetime.fromtimestamp(int(entry['internalDate'])/1000, datetime.timezone.utc).isoformat()
-        format_message(user, entry)
+        entry['fm:link'] = f"https://mail.google.com/mail/u/{user}/?view=pt&search=all&permmsgid=msg-f:{int(entry['id'], 16)}"
+        raw_mail = base64.urlsafe_b64decode(entry['raw'] + '=' * (4 - len(entry['raw']) % 4))
+        entry.update(fm_email.format_email(raw_mail))
 
     state['gmail', user, query, 'latest_id'] = current_latest or prev_latest
 
