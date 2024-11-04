@@ -89,7 +89,8 @@ def format_status(status, link, reblog_author):
             html_parts.append(f"<p>[{a.get('provider_name')}] {a['author_name']} - {a.get('title')}</p>")
         else:
             html_parts.append(f"<p>[{a.get('provider_name')}] {a.get('title')}</p>")
-        html_parts.append(f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>")
+        if a.get('image'):
+            html_parts.append(f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>")
         if a.get('description'):
             html_parts.append(f"<p>Description: {html.escape(a['description'])}</p>")
 
