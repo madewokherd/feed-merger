@@ -229,8 +229,7 @@ def handle_line(line):
         return mastodon.process(line, state)
     elif line.startswith('gmail:'):
         import gmail
-        gmail.process(line, state, items)
-        return core.SUCCESS, None
+        return gmail.process(line, state)
     elif line.startswith('nebula:'):
         import nebula
         nebula.process(line, state, items)

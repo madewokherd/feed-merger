@@ -5,6 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import core
+
 def get_client_credentials(state):
     if ('gmail', 'client_credentials') in state:
         return state['gmail', 'client_credentials']
@@ -103,18 +105,13 @@ def format_body(b, mime_type = 'text/plain'):
 def format_message(user, m):
     p = m['payload']
 
-    subject = None
-    sender = None
-    date = None
     content_type = 'text/plain'
 
     for h in p['headers']:
         if h['name'] == 'From':
-            sender = h['value']
+            m['fm:author'] = h['value']
         elif h['name'] == 'Subject':
-            subject = h['value']
-        elif h['name'] == 'Date':
-            date = h['value']
+            m['fm:title'] = h['value']
         elif h['name'] == 'Content-Type':
             content_type = h['value']
 
@@ -134,14 +131,9 @@ def format_message(user, m):
             if body:
                 break
 
-    message_link = f"https://mail.google.com/mail/u/{user}/?view=pt&search=all&permmsgid=msg-f:{int(m['id'], 16)}"
-    thread_link = f"https://mail.google.com/mail/u/{user}/popout?search=all&th=%23thread-f:{int(m['threadId'], 16)}"
+    m['fm:html'] = body
 
-    return f"""
-<h1>{sender} <a href="{message_link}">{subject}</a> <a href="{thread_link}">{date}</a> <a name="{m['id']}" href="#{m['id']}">[anchor]</a></h1>
-
-{body}
-"""
+    m['fm:link'] = f"https://mail.google.com/mail/u/{user}/?view=pt&search=all&permmsgid=msg-f:{int(m['id'], 16)}"
 
 def api_request(user, state, url, data=None):
     token = get_token(user, state)
@@ -158,7 +150,7 @@ def api_request(user, state, url, data=None):
         else:
             break
 
-def process(line, state, items):
+def process(line, state):
     line = line.split(':', 1)[1] #remove gmail:
     user, query = line.split('/')
 
@@ -166,6 +158,8 @@ def process(line, state, items):
     current_latest = None
 
     messages_query = urllib.parse.urlencode({'q': query})
+
+    j = None
 
     while True:
         messages_url = urllib.parse.urlparse(f"https://gmail.googleapis.com/gmail/v1/users/{user}/messages")._replace(
@@ -175,6 +169,10 @@ def process(line, state, items):
 
         if json_response['messages'] and not current_latest:
             current_latest = json_response['messages'][0]['id']
+
+        if j is None:
+            j = json_response
+            j['fm:entries'] = entries = []
 
         done = False
 
@@ -189,12 +187,18 @@ def process(line, state, items):
 
             m = api_request(user, state, message_url)
 
-            items.append((format_message(user, m), datetime.datetime.fromtimestamp(int(m['internalDate'])/1000, datetime.timezone.utc).isoformat()))
+            entries.append(m)
 
         if done or not json_response.get('nextPageToken') or not prev_latest:
             break
 
         messages_query = urllib.parse.urlencode({'q': query, 'pageToken': json_response["nextPageToken"]})
 
+    for entry in entries:
+        entry['fm:timestamp'] = datetime.datetime.fromtimestamp(int(entry['internalDate'])/1000, datetime.timezone.utc).isoformat()
+        format_message(user, entry)
+
     state['gmail', user, query, 'latest_id'] = current_latest or prev_latest
+
+    return core.JSON, j
 
