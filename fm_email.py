@@ -1,5 +1,6 @@
 import datetime
 import email.policy
+import html
 
 def format_message(msg, format_html=False):
     result = {}
@@ -31,18 +32,27 @@ def format_message(msg, format_html=False):
             parts.append(format_message(part))
 
     if format_html:
+        html_parts = []
+
         body = msg.get_body()
 
-        if body:
-            body_type = body.get_content_type()
-            if body_type == 'text/html':
-                result['fm:html'] = body.get_content()
-            elif body_type == 'text/plain':
-                result['fm:text'] = body.get_content()
+        if body.is_multipart():
+            parts = [part for part in body.iter_parts() if not part.is_attachment()]
+        else:
+            parts = (body,)
+
+        for part in parts:
+            part_type = part.get_content_type()
+            if part_type == 'text/html':
+                html_parts.append(part.get_content())
+            elif part_type == 'text/plain':
+                html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(part.get_content())}</p>''')
             else:
-                print(f"Unknown body content type {body_type}")
+                print(f"Unknown body content type {part_type}")
 
         # TODO: attachments - use a tag with href as a data: url and download="filename"
+
+        result['fm:html'] = '\n'.join(html_parts)
 
     return result
 
