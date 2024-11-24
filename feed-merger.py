@@ -98,14 +98,19 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
 def items_from_json(j, items):
     if 'fm:entries' in j:
         for entry in j['fm:entries']:
-            template_filler = HtmlTemplateFiller({
-                'e': entry,
-                'f': j,
-            })
-            template_filler.feed(entry_template)
-            template_filler.close()
+            try:
+                template_filler = HtmlTemplateFiller({
+                    'e': entry,
+                    'f': j,
+                })
+                template_filler.feed(entry_template)
+                template_filler.close()
 
-            items.append((template_filler.get_contents(), entry['fm:timestamp']))
+                items.append((template_filler.get_contents(), entry['fm:timestamp']))
+            except:
+                print("Failed processing json")
+                print(json.dumps(entry, indent=2))
+                traceback.print_exc()
 
 _BODY_STYLES = {
     'alink': 'div.styleID a:active { color: VAL; } ',
