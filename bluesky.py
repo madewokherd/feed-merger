@@ -49,6 +49,8 @@ def uri_to_https(uri):
         collection, rkey = parse.path.lstrip('/').split('/', 1)
         if collection == 'app.bsky.feed.post':
             return f'https://bsky.app/profile/{did}/post/{rkey}'
+        elif collection == 'app.bsky.feed.generator':
+            return f'https://bsky.app/profile/{did}/feed/{rkey}'
         else:
             return 'uri'
 
@@ -94,7 +96,7 @@ def post_to_html(entry, doc, line, state, url):
         url = uri_to_https(entry['uri'])
 
         if entry.get('value'):
-            html_parts.append(f'''<p><a href="{uri_to_https(entry['uri'])}">Embedded post</a> by <img src="{entry['author']['avatar']}" width=32 height=32> {account_name(entry['author'])}</p>''')
+            html_parts.append(f'''<p><a href="{uri_to_https(entry['uri'])}">Embedded post</a> by <img src="{entry['author']['avatar']}" width=16 height=16> {account_name(entry['author'])}</p>''')
             html_parts.append(f'''<blockquote style="white-space: pre-wrap;">{post_to_html(entry['value'], doc, line, state, url)}</blockquote>''')
     elif entry['py_type'] == 'app.bsky.embed.images#view':
         for image in entry['images']:
@@ -121,6 +123,21 @@ def post_to_html(entry, doc, line, state, url):
         # can't embed an m3u8 with pure HTML, so just put in the video thumbnail
         html_parts.append('<p>[video]</p>')
         html_parts.append(f'''<p><a href="{url}"><img src="{entry['thumbnail']}"></a></p>''')
+    elif entry['py_type'] == 'app.bsky.graph.defs#starterPackViewBasic':
+        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}">starter pack</a> by <img src="{entry['creator']['avatar']}" width=16 height=16> {account_name(entry['creator'])}</p>''')
+        if entry.get('record'):
+            html_parts.append(post_to_html(entry['record'], doc, line, state, url))
+    elif entry['py_type'] == 'app.bsky.graph.starterpack':
+        if entry.get('name'):
+            html_parts.append(f'''<p>{html.escape(entry['name'])}</p>''')
+        if entry.get('description'):
+            html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['description'])}</p>''')
+    elif entry['py_type'] == 'app.bsky.feed.defs#generatorView':
+        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}>feed</a> by <img src="{entry['creator']['avatar']}" width=32 height=32> {account_name(entry['creator'])}:</p>''')
+        if entry.get('display_name'):
+            html_parts.append(f'''<p>{html.escape(entry['display_name'])}</p>''')
+        if entry.get('description'):
+            html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['description'])}</p>''')
     else:
         print(f"Unknown bluesky object type: {entry['py_type']}")
 
@@ -138,6 +155,10 @@ def translate_entry(entry, doc, line, state):
         entry['fm:author'] = account_name(entry['author'])
         entry['fm:avatar'] = entry['author']['avatar']
         entry['fm:timestamp'] = entry['indexed_at']
+        if entry.get('reason_subject'):
+            entry['fm:link'] = uri_to_https(entry['reason_subject'])
+        else:
+            entry['fm:link'] = f'https://bsky.app/profile/{entry['author']['handle']}'
         reason = entry['reason']
         if reason == 'follow':
             entry['fm:title'] = "Followed you"
@@ -149,16 +170,12 @@ def translate_entry(entry, doc, line, state):
             entry['fm:title'] = "Mentioned you"
         elif reason == 'reply':
             entry['fm:title'] = "Replied to your post"
+            if entry.get('record'):
+                entry['fm:html'] = post_to_html(entry['record'], doc, line, state, entry['fm:link'])
         elif reason == 'quote':
             entry['fm:title'] = "Quoted your post"
         else:
             entry['fm:title'] = f"Bluesky notification: {reason}"
-        if entry.get('reason_subject'):
-            entry['fm:link'] = uri_to_https(entry['reason_subject'])
-        else:
-            entry['fm:link'] = f'https://bsky.app/profile/{entry['author']['handle']}'
-        #if entry.get('record'): # none of these have enough information to display, and I don't want to make an extra query
-        #    entry['fm:html'] = post_to_html(entry['record'], doc, line, state, entry['fm:link'])
     else:
         print(f"Unknown bluesky entry type: {entry['py_type']}")
 
