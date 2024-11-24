@@ -77,7 +77,7 @@ def format_status(status, link, reblog_author):
             images = [a[i] for i in ['preview_url', 'url', 'preview_remote_url', 'remote_url'] if a.get(i)]
             if images:
                 img_tags = f'''<img src="{images[-1]}">'''
-                for img in images[0:-1]:
+                for img in images[-2::-1]:
                     img_tags = f'''<object data="{img}">{img_tags}</object>'''
                 html_parts.append(f"<p><a href=\"{a['url']}\">{img_tags}</a></p>")
             if a.get('description'):
