@@ -76,7 +76,7 @@ def post_to_html(entry, doc, line, state, url):
             html_parts.append(post_to_html(entry['post'], doc, line, state, url))
 
         if entry.get('labels'):
-            for label in labels:
+            for label in entry.get('labels'):
                 if label.get('val') in ('sexual',):
                     html_parts.insert(0, f'''<details><summary>{label['val']}</summary>''')
                     html_parts.append('</details>')
@@ -89,6 +89,13 @@ def post_to_html(entry, doc, line, state, url):
 
         if entry.get('embed'):
             html_parts.append(post_to_html(entry['embed'], doc, line, state, url))
+
+        if entry.get('labels'):
+            for label in entry.get('labels'):
+                if label.get('val') in ('sexual',):
+                    html_parts.insert(0, f'''<details><summary>{label['val']}</summary>''')
+                    html_parts.append('</details>')
+                    break
     elif entry['py_type'] == 'app.bsky.feed.post':
         if entry.get('text'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['text'])}</p>''')
@@ -102,7 +109,7 @@ def post_to_html(entry, doc, line, state, url):
         for image in entry['images']:
             html_parts.append(post_to_html(image, doc, line, state, url))
     elif entry['py_type'] == 'app.bsky.embed.images#viewImage':
-        html_parts.append(f'''<p><a href="{entry['fullsize']}"><img src="{entry['thumb']}"></a></p>''')
+        html_parts.append(f'''<p><a href="{entry['fullsize']}"><img src="{entry['thumb']}" style="max-height: 100vh; max-width: 100vw"></a></p>''')
 
         if entry.get('alt'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">Image description: {html.escape(entry['alt'])}</p>''')
@@ -113,7 +120,7 @@ def post_to_html(entry, doc, line, state, url):
     elif entry['py_type'] == 'app.bsky.embed.external#viewExternal':
         html_parts.append(f'''<p><a href="{entry['uri']}">{html.escape(entry.get('title', 'Link embed:'))}</a></p>''')
         if entry.get('thumb'):
-            html_parts.append(f'''<p><img src="{entry['thumb']}"></p>''')
+            html_parts.append(f'''<p><img src="{entry['thumb']}" style="max-height: 100vh; max-width: 100vw"></p>''')
         if entry.get('description'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">Description: {html.escape(entry['description'])}</p>''')
     elif entry['py_type'] == 'app.bsky.embed.recordWithMedia#view':
@@ -122,7 +129,7 @@ def post_to_html(entry, doc, line, state, url):
     elif entry['py_type'] == 'app.bsky.embed.video#view':
         # can't embed an m3u8 with pure HTML, so just put in the video thumbnail
         html_parts.append('<p>[video]</p>')
-        html_parts.append(f'''<p><a href="{url}"><img src="{entry['thumbnail']}"></a></p>''')
+        html_parts.append(f'''<p><a href="{url}"><img src="{entry['thumbnail']}" style="max-height: 100vh; max-width: 100vw"></a></p>''')
     elif entry['py_type'] == 'app.bsky.graph.defs#starterPackViewBasic':
         html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}">starter pack</a> by <img src="{entry['creator']['avatar']}" width=16 height=16> {account_name(entry['creator'])}</p>''')
         if entry.get('record'):
