@@ -76,9 +76,9 @@ def format_status(status, link, reblog_author):
             html_parts.append(f"<p>[{a['type']}]</p>")
             images = [a[i] for i in ['preview_url', 'url', 'preview_remote_url', 'remote_url'] if a.get(i)]
             if images:
-                img_tags = f'''<img src="{images[-1]}">'''
+                img_tags = f'''<img src="{images[-1]}" style="max-height: 100vh; max-width: 100vw">'''
                 for img in images[-2::-1]:
-                    img_tags = f'''<object data="{img}">{img_tags}</object>'''
+                    img_tags = f'''<object data="{img}" style="max-height: 100vh; max-width: 100vw">{img_tags}</object>'''
                 html_parts.append(f"<p><a href=\"{a['url']}\">{img_tags}</a></p>")
             if a.get('description'):
                 html_parts.append(f"""<p style="white-space: pre-wrap;">Description: {html.escape(a['description'])}</p>""")
@@ -90,7 +90,7 @@ def format_status(status, link, reblog_author):
         else:
             html_parts.append(f"<p>[{a.get('provider_name')}] {a.get('title')}</p>")
         if a.get('image'):
-            html_parts.append(f"<p><a href=\"{a['url']}\"><img src=\"{a['image']}\"></a></p>")
+            html_parts.append(f"""<p><a href=\"{a['url']}\"><img src=\"{a['image']}\" style="max-height: 100vh; max-width: 100vw"></a></p>""")
         if a.get('description'):
             html_parts.append(f"<p>Description: {html.escape(a['description'])}</p>")
 
