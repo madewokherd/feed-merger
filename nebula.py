@@ -2,6 +2,8 @@ import json
 import urllib.parse
 import urllib.request
 
+import core
+
 from html import escape as e
 
 def process(line, state, items):
@@ -13,8 +15,14 @@ def process(line, state, items):
 
     recent_timestamp = None
 
+    result = None
+
     while True:
         j = json.load(urllib.request.urlopen(page_url))
+
+        if result is None:
+            result = j
+            result['fm:entries'] = entries = []
 
         if recent_timestamp is None:
             recent_timestamp = j['results'][0]['published_at']
@@ -23,15 +31,14 @@ def process(line, state, items):
             if since_timestamp and since_timestamp >= video['published_at']:
                 break
 
-            broken_description = e(video['description']).replace('\n', '<br>')
+            entries.append(video)
 
-            items.append((f"""
-
-<h1><a href="{video['share_url']}">{video['channel_title']} - {video['title']}</a> {video['published_at']} <a name="{video['slug']}" href="#{video['slug']}">[anchor]</a></h1>
-
-<p><img width=320 height=180 src="{video['images']['thumbnail']['src']}"></p>
-
-<p>{broken_description}</p>""", video['published_at']))
+            video['fm:text'] = video['description']
+            video['fm:link'] = video['share_url']
+            video['fm:author'] = video['channel_title']
+            video['fm:timestamp'] = video['published_at']
+            video['fm:thumbnail'] = video['images']['thumbnail']['src']
+            video['fm:title'] = video['title']
 
         else:
             if not since_timestamp:
@@ -43,4 +50,6 @@ def process(line, state, items):
         break
 
     state[('nebula', url, 'since_timestamp')] = recent_timestamp or since_timestamp
+
+    return core.JSON, result
 
