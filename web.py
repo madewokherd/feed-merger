@@ -410,8 +410,15 @@ def handle_mrss(entry):
         if isinstance(thumbnail, list):
             thumbnail = thumbnail[0]
         entry['fm:thumbnail'] = thumbnail['url']
-    if 'media:content' in entry and entry['media:content'].get('medium') == 'image':
-        entry['fm:thumbnail'] = entry['media:content']['url']
+    if 'media:content' in entry:
+        if isinstance(entry['media:content'], list):
+            contents = entry['media:content']
+        else:
+            contents = (entry['media:content'],)
+        for content in contents:
+            if content.get('medium') == 'image':
+                entry['fm:thumbnail'] = content['url']
+                break
 
 def handle_rss(url, js, state, data, data_str, tokens):
     prev_latest = state.get(('rss', url, 'latest'))
