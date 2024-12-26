@@ -87,6 +87,9 @@ def process_branch(line, state, items):
 
     page = 1
 
+    result = {}
+    result['fm:entries'] = entries = []
+
     while True:
         j = json.load(api_request(state, url))
 
@@ -98,15 +101,12 @@ def process_branch(line, state, items):
             if commit['id'] == since_sha:
                 break
 
-            message = e(commit['message']).replace('\n','<br>')
+            entries.append(commit)
 
-            content = f"""
-
-<h1><a href="{e(commit['web_url'])}">{e(commit['author_name'])}: {e(commit['title'])}</a> {commit['created_at']} <a name="{commit['id']}" href="#{commit['id']}">[anchor]</a></h1>
-
-<p>{message}</p>"""
-
-            items.append((content, commit['created_at']))
+            commit['fm:text'] = commit['message']
+            commit['fm:link'] = commit['web_url']
+            commit['fm:author'] = commit['author_name']
+            commit['fm:timestamp'] = commit['created_at']
 
         if not since or len(j) < 100:
             break
@@ -125,6 +125,8 @@ def process_branch(line, state, items):
 
     state['gitlab', 'branch', host, owner, repo, branch, 'since'] = recent or since
     state['gitlab', 'branch', host, owner, repo, branch, 'since_sha'] = recent_sha or since_sha
+
+    return core.JSON, result
 
 def process_projects(line, state, items):
     host = urllib.parse.urlparse(line)._replace(fragment="", query="", path="").geturl()
@@ -209,8 +211,7 @@ def process(line, state, items):
     prefix, line = line.split(':', 1)
 
     if prefix == 'gitlab-branch':
-        process_branch(line, state, items)
-        return core.SUCCESS, None
+        return process_branch(line, state, items)
     elif prefix == 'gitlab-projects':
         return process_projects(line, state, items)
     elif prefix == 'gitlab-mirror-push-failures':
