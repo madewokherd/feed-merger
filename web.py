@@ -442,7 +442,7 @@ def handle_rss(url, js, state, data, data_str, tokens):
             continue
 
         if token_type == STARTTAG:
-            stack.append((token_name, dict(token_data)))
+            stack.append((token_name, {key: value for key, value in token_data if not key.startswith('xmlns:')}))
             continue
 
         if token_type == DATA and token_name.strip():
@@ -572,7 +572,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
             continue
 
         if token_type == STARTTAG:
-            stack.append((token_name, dict(token_data)))
+            stack.append((token_name, {key: value for key, value in token_data if not key.startswith('xmlns:')}))
             if stack[-1][1].get('type') == 'xhtml':
                 stack[-1][1]['fm:_inner_xml'] = []
             continue
