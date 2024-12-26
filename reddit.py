@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 
 import agegate
+import core
 
 from html import escape as e
 
@@ -144,16 +145,18 @@ def process_entry(entry, state, items):
     # TODO: other entry types besides link
 
     if entry['over_18'] and not agegate.check(state):
-        return
+        return False
 
-    posted = datetime.datetime.fromtimestamp(entry['created'], datetime.timezone.utc).isoformat()
+    entry['fm:timestamp'] = datetime.datetime.fromtimestamp(entry['created'], datetime.timezone.utc).isoformat()
+    entry['fm:link'] = f"""https://www.reddit.com/{entry['permalink'].lstrip('/')}"""
+    entry['fm:feedname'] = entry['permalink'][1:entry['permalink'].find('/', 3)]
+    entry['fm:author'] = entry['author']
+    entry['fm:title'] = entry['title']
+    entry['fm:html'] = entry['selftext_html']
+    if entry.get('preview') and entry['preview'].get('images') and entry['preview']['images'][0].get('source'):
+        entry['fm:thumbnail'] = entry['preview']['images'][0]['source'].get('url')
 
-    items.append((f"""
-
-<h1><a href="https://www.reddit.com/{entry['permalink'].lstrip('/')}">{entry['permalink'][1:entry['permalink'].find('/', 3)]} - {e(entry['author'])} - {e(entry['title'])}</a> {posted} <a name="{entry['name']}" href="#{entry['name']}">[anchor]</a></h1>
-
-{entry['selftext_html']}
-""", posted))
+    return True
 
 def process_search_links(query, state, items):
     latest = state.get(('reddit', 'search', 'links', query, 'latest'))
@@ -177,11 +180,17 @@ def process_search_links(query, state, items):
 
     stop = False
 
+    result = None
+
     while not stop:
         query_str = urllib.parse.urlencode(query_dict)
         url = urllib.parse.urlparse(url)._replace(query=query_str).geturl()
 
         json = api_request(state, url)
+
+        if result is None:
+            result = json
+            result['fm:entries'] = entries = []
 
         j = json['data']
 
@@ -195,7 +204,8 @@ def process_search_links(query, state, items):
                 stop = True
                 break
 
-            process_entry(entry, state, items)
+            if process_entry(entry, state, items):
+                entries.append(entry)
 
         if not latest or not j.get('after'):
             break
@@ -203,6 +213,8 @@ def process_search_links(query, state, items):
         query_dict['after'] = j['after']
 
     state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
+
+    return core.JSON, result
 
 def process_subreddit(subreddit, state, items):
     latest = state.get(('reddit', 'subreddit', subreddit, 'latest'))
@@ -219,11 +231,17 @@ def process_subreddit(subreddit, state, items):
 
     count = 0
 
+    result = None
+
     while True:
         query = urllib.parse.urlencode(query_dict)
         url = urllib.parse.urlparse(url)._replace(query=query).geturl()
 
         json = api_request(state, url)
+
+        if result is None:
+            result = json
+            result['fm:entries'] = entries = []
 
         j = json['data']
 
@@ -233,7 +251,8 @@ def process_subreddit(subreddit, state, items):
             if new_latest is None:
                 new_latest = entry['name']
 
-            process_entry(entry, state, items)
+            if process_entry(entry, state, items):
+                entries.append(entry)
 
         if not latest or not j.get('after'):
             break
@@ -241,6 +260,8 @@ def process_subreddit(subreddit, state, items):
         query['after'] = j['after']
 
     state['reddit', 'subreddit', subreddit, 'latest'] = new_latest or latest
+
+    return core.JSON, result
 
 def process(line, state, items):
     line = line.split(':', 1)[1] # remove reddit:
@@ -250,11 +271,11 @@ def process(line, state, items):
         # subreddit
         subreddit = rest
 
-        process_subreddit(rest, state, items)
+        return process_subreddit(rest, state, items)
     elif prefix == 'search':
         kind, rest = rest.split('/', 1)
         if kind == 'link':
-            process_search_links(rest, state, items)
+            return process_search_links(rest, state, items)
         else:
             raise Exception("unknown search type")
     else:

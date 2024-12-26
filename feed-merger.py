@@ -246,8 +246,7 @@ def handle_line(line):
         return gitlab.process(line, state, items)
     elif line.startswith('reddit:'):
         import reddit
-        reddit.process(line, state, items)
-        return core.SUCCESS, None
+        return reddit.process(line, state, items)
     elif line.startswith('include:'):
         process_file(line.split(':', 1)[1])
         return core.SUCCESS, None
