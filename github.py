@@ -63,7 +63,12 @@ def process_branch(line, state, items):
     recent = None
     recent_sha = None
 
+    result = None
+
     page = 1
+
+    result = {}
+    result['fm:entries'] = entries = []
 
     while True:
         list_response = api_request(state, url)
@@ -78,14 +83,12 @@ def process_branch(line, state, items):
             if commit['sha'] == since_sha:
                 break
 
-            content = f"""
+            entries.append(commit)
 
-<h1><a href="{e(commit['html_url'])}">{e(commit['commit']['author']['name'])}: {e(commit['commit']['message'].splitlines()[0].strip())}</a> {commit['commit']['committer']['date']} <a name="{commit['sha']}" href="#{commit['sha']}">[anchor]</a></h1>"""
-
-            for line in commit['commit']['message'].splitlines()[1:]:
-                content += f"<p>{e(line)}</p>"
-
-            items.append((content, commit['commit']['committer']['date']))
+            commit['fm:link'] = commit['html_url']
+            commit['fm:author'] = commit['commit']['author']['name']
+            commit['fm:text'] = commit['commit']['message']
+            commit['fm:timestamp'] = commit['commit']['committer']['date']
 
         if not since or len(j) < 100:
             break
@@ -102,6 +105,8 @@ def process_branch(line, state, items):
 
     state['github', 'branch', owner, repo, branchname, 'since'] = recent or since
     state['github', 'branch', owner, repo, branchname, 'since_sha'] = recent_sha or since_sha
+
+    return core.JSON, result
 
 def process_issue_search(line, state, items):
     search_query = line
@@ -167,8 +172,7 @@ def process(line, state, items):
     prefix, line = line.split(':', 1)
 
     if prefix == 'github-branch':
-        process_branch(line, state, items)
-        return core.SUCCESS, None
+        return process_branch(line, state, items)
 
     if prefix == 'github-issue-search':
         return process_issue_search(line, state, items)
