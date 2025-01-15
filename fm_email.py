@@ -3,6 +3,8 @@ import datetime
 import email.policy
 import html
 
+import core
+
 def format_part(part):
     part_type = part.get_content_type()
     if part_type == 'text/html':
@@ -72,4 +74,46 @@ def format_email(raw_mail):
     msg = email.message_from_bytes(raw_mail, policy=email.policy.default)
 
     return format_message(msg, True)
+
+def process_mbox(line, state):
+    import mailbox
+
+    filename = line.split(':', 1)[1]
+
+    prev_last_seen = state.get(('mbox', filename, 'last_seen'))
+    new_last_seen = None
+
+    result = {}
+    entries = result['fm:entries'] = []
+
+    data = []
+    use = False
+    with open(filename, 'rb') as f:
+        for line in f:
+            if line.startswith(b'From '):
+                if use:
+                    entries.append(format_email(b''.join(data)))
+                    data = []
+
+                sortdate = email.utils.parsedate_to_datetime(
+                    line.decode('ascii').split(' ', 2)[2]).isoformat()
+
+                if prev_last_seen and prev_last_seen >= sortdate:
+                    use = False
+                else:
+                    use = True
+
+                if not new_last_seen or sortdate > new_last_seen:
+                    new_last_seen = sortdate
+                
+            elif use:
+                data.append(line)
+
+    if use:
+        entries.append(format_email(b''.join(data)))
+
+    if new_last_seen:
+        state[('mbox', filename, 'last_seen')] = new_last_seen
+
+    return core.JSON, result
 

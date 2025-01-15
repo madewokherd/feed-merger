@@ -274,6 +274,9 @@ def handle_line(line):
     elif line.startswith('bluesky-notifications:'):
         import bluesky
         return bluesky.process(line, state)
+    elif line.startswith('mbox:'):
+        import fm_email
+        return fm_email.process_mbox(line, state)
     elif line.endswith('.txt'):
         process_file(line)
         return core.SUCCESS, None
