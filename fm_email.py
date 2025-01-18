@@ -86,14 +86,27 @@ def process_mbox(line, state):
     prev_last_seen = state.get(('mbox', filename, 'last_seen'))
     new_last_seen = None
 
+    prev_last_ofs, prev_last_from = state.get(('mbox', filename, 'last_from'), (None, None))
+    new_last_ofs = new_last_from = None
+
     result = {}
     entries = result['fm:entries'] = []
 
     data = []
     use = False
     with open(filename, 'rb') as f:
+        # try skipping to the last seen email
+        if prev_last_ofs:
+            f.seek(prev_last_ofs)
+            fr = f.read(len(prev_last_from))
+            if prev_last_from != fr:
+                f.seek(0)
+
         for line in f:
             if line.startswith(b'From '):
+                new_last_from = line
+                new_last_ofs = f.tell() - len(line)
+
                 if use:
                     entries.append(format_email(b''.join(data)))
                     data = []
@@ -117,6 +130,9 @@ def process_mbox(line, state):
 
     if new_last_seen:
         state[('mbox', filename, 'last_seen')] = new_last_seen
+
+    if new_last_ofs:
+        state[('mbox', filename, 'last_from')] = (new_last_ofs, new_last_from)
 
     return core.JSON, result
 
