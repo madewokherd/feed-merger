@@ -24,6 +24,9 @@ def format_content(msg):
 
     body = msg.get_body()
 
+    if not body:
+        return ''
+
     if body.is_multipart():
         parts = [part for part in body.iter_parts() if not part.is_attachment()]
     else:
