@@ -478,7 +478,7 @@ def handle_rss(url, js, state, data, data_str, tokens):
             continue
 
     if 'title' in js:
-        js['fm:title'] = js['title']
+        js['fm:title'] = html.unescape(js['title'])
 
     for entry in js['fm:entries']:
         if 'link' in entry:
@@ -486,7 +486,7 @@ def handle_rss(url, js, state, data, data_str, tokens):
         elif 'enclosure' in entry and 'url' in entry['enclosure']:
             entry['fm:link'] = entry['enclosure']['url']
         if 'title' in entry:
-            entry['fm:title'] = entry['title']
+            entry['fm:title'] = html.unescape(entry['title'])
         if 'content:encoded' in entry:
             entry['fm:html'] = entry['content:encoded']
         elif 'description' in entry:
