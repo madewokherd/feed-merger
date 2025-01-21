@@ -286,6 +286,8 @@ def handle_line(line):
 item_counter = 0
 
 def add_defaults(line, j):
+    favicon = None
+    favicon_checked = False
     for entry in j.get('fm:entries', ()):
         entry['fm:source'] = line
         if 'fm:timestamp' not in entry:
@@ -294,6 +296,17 @@ def add_defaults(line, j):
             entry['fm:id'] = entry['fm:link']
         if 'fm:text' in entry and 'fm:html' not in entry:
             entry['fm:html'] = f'<div style="white-space: pre-wrap;">{html.escape(entry["fm:text"])}</div>'
+        if 'fm:avatar' not in entry and line.startswith('https:'):
+            if not favicon_checked:
+                favicon = urllib.parse.urljoin(line, '/favicon.ico')
+                try:
+                    urllib.request.urlopen(urllib.request.Request(favicon, method='HEAD'))
+                except:
+                    favicon = None
+                favicon_checked = True
+            if favicon:
+                entry['fm:avatar'] = favicon
+
         global item_counter
         item_counter += 1
         entry['fm:counter'] = item_counter
