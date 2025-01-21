@@ -494,7 +494,10 @@ def handle_rss(url, js, state, data, data_str, tokens):
         if 'author' in entry:
             entry['fm:author'] = entry['author']
         elif 'dc:creator' in entry:
-            entry['fm:author'] = entry['dc:creator']
+            if isinstance(entry['dc:creator'], list):
+                entry['fm:author'] = ', '.join(entry['dc:creator'])
+            else:
+                entry['fm:author'] = entry['dc:creator']
         if 'pubdate' in entry:
             entry['fm:timestamp'] = email.utils.parsedate_to_datetime(entry['pubdate']).isoformat()
         handle_mrss(entry)
