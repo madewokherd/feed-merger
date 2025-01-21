@@ -37,6 +37,7 @@ def process(line, state, items):
             video['fm:link'] = video['share_url']
             video['fm:author'] = video['channel_title']
             video['fm:timestamp'] = video['published_at']
+            video['fm:avatar'] = video['images']['channel_avatar']['src']
             video['fm:thumbnail'] = video['images']['thumbnail']['src']
             video['fm:title'] = video['title']
 
