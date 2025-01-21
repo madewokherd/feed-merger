@@ -98,6 +98,34 @@ def format_status(status, link, reblog_author):
         if a.get('description'):
             html_parts.append(f"<p>Description: {html.escape(a['description'])}</p>")
 
+    poll = status.get('poll')
+    if poll:
+        html_parts.append('<p>[poll]</p>')
+        html_parts.append(f'''<p>{poll['voters_count']} voted</p>''')
+        if poll['multiple']:
+            html_parts.append('<p>multiple choice</p>')
+
+        results = []
+
+        if poll.get('voters_count'):
+            results.append('<ul>')
+            for option in poll['options']:
+                results.append(f'''<li>{html.escape(option['title'])} - {option['votes_count']} votes ({option['votes_count']/poll['voters_count']*100:.1f}%)</li>''')
+            results.append('</ul>')
+
+        if poll['voted'] or poll['expired']:
+            html_parts.extend(results)
+        else:
+            html_parts.append('<ul>')
+            for option in poll['options']:
+                html_parts.append(f'''<li>{html.escape(option['title'])}</li>''')
+            html_parts.append('</ul>')
+
+            if results:
+                html_parts.append('<details><summary>Show results</summary>')
+                html_parts.extend(results)
+                html_parts.append('</details>')
+
     html_end_parts.reverse()
     html_parts.extend(html_end_parts)
 
