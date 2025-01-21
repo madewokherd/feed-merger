@@ -70,6 +70,10 @@ def format_status(status, link, reblog_author):
 
     html_parts.append(status['content'])
 
+    if status.get('sensitive') and not status.get('spoiler_text') and status.get('media_attachments'):
+        html_parts.append("<details><summary>sensitive media</summary>")
+        html_end_parts.append("</details>")
+
     media_attachments = status.get('media_attachments')
     if media_attachments:
         for a in media_attachments:
