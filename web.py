@@ -420,6 +420,87 @@ def handle_mrss(entry):
                 entry['fm:thumbnail'] = content['url']
                 break
 
+def find_favicon(url):
+    best_link = None
+    best_size = -1
+    tokens = get_page_tokens(url)
+    for token in tokens:
+        if token[0] == STARTTAG and token[1] == 'link':
+            attrs = dict(token[2])
+            if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon"):
+                if 'sizes' in attrs:
+                    if attrs['sizes'] == 'any':
+                        return urllib.parse.urljoin(url, attrs['href'])
+                    this_size = int(attrs['sizes'].split('x')[0])
+                elif attrs['rel'] == 'apple-touch-icon':
+                    this_size = 192
+                else:
+                    this_size = 16
+                if this_size > best_size:
+                    best_size = this_size
+                    best_link = urllib.parse.urljoin(url, attrs['href'])
+    return best_link # may be None
+
+def find_avatars(js):
+    authors = {}
+
+    for entry in js.get('fm:entries', ()):
+        if 'fm:avatar' not in entry:
+            if 'fm:author' in entry and 'fm:link' in entry:
+                author = entry['fm:author']
+                if author in authors:
+                    if authors[author]:
+                        entry['fm:avatar'] = authors[author]
+                    continue
+
+                # search page for author link
+                tokens = get_page_tokens(entry['fm:link'])
+                author_link = None
+                avatar_link = None
+                for i in range(len(tokens)):
+                    if tokens[i][0] == STARTTAG and tokens[i][1] == 'a':
+                        num_indicators = 0
+                        attrs = dict(tokens[i][2])
+                        if attrs.get('href'):
+                            img_link = None
+                            if 'author' in attrs['href'].lower():
+                                num_indicators += 1
+                            if attrs.get('class') and 'author' in attrs['class']:
+                                num_indicators += 1
+                            if i + 1 < len(tokens) and tokens[i+1][0] == DATA and author in tokens[i+1][1]:
+                                num_indicators += 1
+                            if i + 1 < len(tokens) and tokens[i+1][0] == STARTTAG and tokens[i+1][1] == 'img':
+                                img_attrs = dict(tokens[i+1][2])
+                                if 'src' in img_attrs:
+                                    img_link = img_attrs['src']
+                                    if 'author' in img_link.lower() or 'headshot' in img_link.lower():
+                                        num_indicators += 1
+                                if 'alt' in img_attrs and author in img_attrs['alt']:
+                                    num_indicators += 1
+                            if num_indicators >= 2:
+                                author_link = attrs['href']
+                                if img_link:
+                                    avatar_link = img_link
+                                    break
+                if avatar_link:
+                    authors[author] = urllib.parse.urljoin(entry['fm:link'], avatar_link)
+                    entry['fm:avatar'] = authors[author]
+                    continue
+
+                if author_link:
+                    author_link = urllib.parse.urljoin(entry['fm:link'], author_link)
+                    print(f'TODO: extract author avatar from {author_link}')
+                
+                authors[author] = None
+
+    if any('fm:avatar' not in x for x in js.get('fm:entries', ())) and js.get('fm:link'):
+        favicon = find_favicon(js['fm:link'])
+        if favicon:
+            js['fm:avatar'] = favicon
+            for entry in js['fm:entries']:
+                if 'fm:avatar' not in entry:
+                    entry['fm:avatar'] = favicon
+
 def handle_rss(url, js, state, data, data_str, tokens):
     prev_latest = state.get(('rss', url, 'latest'))
 
@@ -480,6 +561,9 @@ def handle_rss(url, js, state, data, data_str, tokens):
     if 'title' in js:
         js['fm:title'] = html.unescape(js['title'])
 
+    if 'link' in js:
+        js['fm:link'] = js['link']
+
     for entry in js['fm:entries']:
         if 'link' in entry:
             entry['fm:link'] = entry['link']
@@ -513,6 +597,8 @@ def handle_rss(url, js, state, data, data_str, tokens):
                 new_latest = ts
 
     state['rss', url, 'latest'] = new_latest or prev_latest
+
+    find_avatars(js)
 
     return core.JSON, js
 
@@ -653,7 +739,21 @@ def handle_atom(url, js, state, data, data_str, tokens):
 
     state['atom', url, 'latest'] = new_latest or prev_latest
 
+    find_avatars(js)
+
     return core.JSON, js
+
+def get_page_tokens(url):
+    headers = {}
+    headers['User-Agent'] = 'feed-merger/1.0 +https://github.com/madewokherd/feed-merger'
+    js, headers, response = fetch_http(url, headers=headers)
+    data = response.read()
+
+    data_str = data.decode(js.get('http:charset', 'utf-8'), errors='replace')
+    parser = HtmlTokenizer()
+    parser.feed(data_str)
+
+    return parser.tokens
 
 def handle_sgml(url, js, state, response):
     data = response.read()
