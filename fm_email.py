@@ -2,8 +2,10 @@ import base64
 import datetime
 import email.policy
 import html
+import json
 
 import core
+import web
 
 def format_part(part):
     part_type = part.get_content_type()
@@ -70,6 +72,26 @@ def format_message(msg, format_html=False):
 
     if format_html:
         result['fm:html'] = format_content(msg)
+
+        parser = web.HtmlTokenizer()
+        parser.feed(result['fm:html'])
+        tokens = parser.tokens
+
+        in_inboxmarkup = False
+        for token in tokens:
+            if token[0] == web.STARTTAG and token[1] == 'script':
+                attrs = dict(token[2])
+                if attrs.get('data-scope') == 'inboxmarkup' and attrs.get('type') == 'application/json':
+                    in_inboxmarkup = True
+            elif in_inboxmarkup:
+                if token[0] == web.ENDTAG:
+                    in_inboxmarkup = False
+                elif token[0] == web.DATA:
+                    result['email:inboxmarkup'] = json.loads(html.unescape(token[1]))
+
+    if result.get('email:inboxmarkup'):
+        if result['email:inboxmarkup'].get('entity') and result['email:inboxmarkup']['entity'].get('avatar_image_url'):
+            result['fm:avatar'] = result['email:inboxmarkup']['entity']['avatar_image_url']
 
     return result
 
