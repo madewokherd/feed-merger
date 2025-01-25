@@ -430,15 +430,21 @@ def find_favicon(url):
             if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon"):
                 if 'sizes' in attrs:
                     if attrs['sizes'] == 'any':
-                        return urllib.parse.urljoin(url, attrs['href'])
-                    this_size = int(attrs['sizes'].split('x')[0])
+                        this_size = "any"
+                    else:
+                        this_size = int(attrs['sizes'].split('x')[0])
                 elif attrs['rel'] == 'apple-touch-icon':
                     this_size = 192
                 else:
                     this_size = 16
-                if this_size > best_size:
+                if this_size != "any" and this_size > best_size:
                     best_size = this_size
                     best_link = urllib.parse.urljoin(url, attrs['href'])
+        if token[0] == STARTTAG and token[1] == 'meta':
+            attrs = dict(token[2])
+            if attrs.get('name') == 'parsely-image-url':
+                # tumblr uses this for the user avatar, so prefer it
+                return urllib.parse.urljoin(url, attrs['content'])
     return best_link # may be None
 
 def find_avatars(js):
