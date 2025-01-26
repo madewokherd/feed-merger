@@ -1,11 +1,16 @@
 import base64
 import datetime
+import dns.resolver
 import email.policy
 import html
 import json
 
+import publicsuffixlist
+
 import core
 import web
+
+psl = publicsuffixlist.PublicSuffixList()
 
 def format_part(part):
     part_type = part.get_content_type()
@@ -40,6 +45,22 @@ def format_content(msg):
     # TODO: attachments - use a tag with href as a data: url and download="filename"
 
     return '\n'.join(html_parts)
+
+def avatar_from_bimi_domain(suffix, selector="default"):
+    try:
+        bimi_answer = dns.resolver.query(f'{selector}._bimi.{suffix}', 'TXT')
+
+        for rdata in bimi_answer:
+            txt_string = b''.join(rdata.strings).decode('utf8')
+            terms = txt_string.split('; ')
+            if 'v=BIMI1' in terms:
+                for term in terms:
+                    if term.startswith('l='):
+                        return term[2:]
+    except dns.resolver.NoAnswer:
+        pass
+    except dns.resolver.NXDOMAIN:
+        pass
 
 def format_message(msg, format_html=False):
     result = {}
@@ -92,6 +113,28 @@ def format_message(msg, format_html=False):
     if result.get('email:inboxmarkup'):
         if result['email:inboxmarkup'].get('entity') and result['email:inboxmarkup']['entity'].get('avatar_image_url'):
             result['fm:avatar'] = result['email:inboxmarkup']['entity']['avatar_image_url']
+
+    if 'fm:avatar' not in result and 'from' in msg:
+        from_addr = msg['from'].rsplit(' <', 1)[-1].strip().rstrip('>')
+
+        from_host = from_addr.rsplit('@', 1)[1]
+
+        # bimi
+        if 'bimi-selector' in msg:
+            selector = msg['bimi-selector']
+        else:
+            selector = 'default'
+
+        bimi_avatar = avatar_from_bimi_domain(from_host, selector)
+
+        if not bimi_avatar:
+            org_domain = psl.privatesuffix(from_host)
+
+            if org_domain != from_host:
+                bimi_avatar = avatar_from_bimi_domain(org_domain, selector)
+
+        if bimi_avatar:
+            result['fm:avatar'] = bimi_avatar
 
     return result
 
