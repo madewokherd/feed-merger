@@ -782,8 +782,11 @@ def handle_atom(url, js, state, data, data_str, tokens):
                 entry['fm:html'] = content.get('inner', '')
                 if 'xml:base' in content and entry is not js:
                     entry['fm:base'] = content['xml:base']
-        if 'author' in entry and 'name' in entry['author']:
-            entry['fm:author'] = entry['author']['name']
+        if 'author' in entry:
+            if 'name' in entry['author']:
+                entry['fm:author'] = entry['author']['name']
+            if 'uri' in entry['author']:
+                entry['fm:author_link'] = entry['author']['uri']
         if 'published' in entry or 'updated' in entry:
             entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
         handle_mrss(entry)
