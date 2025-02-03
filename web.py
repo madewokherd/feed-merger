@@ -300,6 +300,13 @@ def handle_mcstories(url, js, state, data, data_str, tokens):
 
     return core.UNHANDLED, None
 
+url_host_handlers = {
+    'com': {
+        'codeweavers': {
+            'www': 'codeweavers.process',
+        },
+    },
+}
 
 html_host_handlers = {
     'com': {
@@ -319,6 +326,9 @@ def find_host_handler(url, host_handlers):
         if segment not in host_handlers:
             return None
         host_handlers = host_handlers[segment]
+        if isinstance(host_handlers, str):
+            module, fn = host_handlers.rsplit('.', 1)
+            return getattr(__import__(module), fn)
         if not isinstance(host_handlers, dict):
             return host_handlers
 
@@ -933,6 +943,12 @@ def fill_http_defaults(json):
                 entry['fm:link'] = j['http:url']
 
 def process(line, state):
+    host_handler = find_host_handler(line, url_host_handlers)
+    if host_handler:
+        result = host_handler(line, state)
+        if result[0] != core.UNHANDLED:
+            return result
+
     etag = state.get(('web', line, 'etag'))
     mtime = state.get(('web', line, 'mtime'))
 
