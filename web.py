@@ -639,6 +639,9 @@ def handle_rss(url, js, state, data, data_str, tokens):
     if 'link' in js:
         js['fm:link'] = js['link']
 
+    if 'icon' in js:
+        js['fm:avatar'] = js['icon']
+
     for entry in js['fm:entries']:
         if 'link' in entry:
             entry['fm:link'] = entry['link']
@@ -659,6 +662,8 @@ def handle_rss(url, js, state, data, data_str, tokens):
                 entry['fm:author'] = entry['dc:creator']
         if 'pubdate' in entry:
             entry['fm:timestamp'] = email.utils.parsedate_to_datetime(entry['pubdate']).isoformat()
+        if 'icon' in entry:
+            entry['fm:avatar'] = entry['icon']
         handle_mrss(entry)
 
     for i in range(len(js['fm:entries']) - 1, -1, -1):
