@@ -691,7 +691,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
 
     # split this into dictionaries
     for (token_type, token_name, token_data) in tokens:
-        if token_type == STARTTAG and token_name in ('atom', 'channel'):
+        if token_type == STARTTAG and token_name in ('feed', 'channel'):
             # ignore these tags
             continue
 
