@@ -54,10 +54,18 @@ def uri_to_https(uri):
         else:
             return 'uri'
 
-def account_name(acct):
+def account_name(acct, full=False, escape=True):
     if acct.get('display_name'):
-        return html.escape(acct['display_name'])
-    return html.escape(acct['handle'])
+        if full:
+            result = f'{acct['display_name']} - {acct['handle']}'
+        else:
+            result = acct['display_name']
+    else:
+        result = acct['handle']
+    if escape:
+        return html.escape(result)
+    else:
+        return result
 
 def post_to_html(entry, doc, line, state, url):
     html_parts = []
@@ -154,12 +162,12 @@ def translate_entry(entry, doc, line, state):
     if entry['py_type'] == 'app.bsky.feed.defs#feedViewPost':
         post = entry['post']
         entry['fm:link'] = uri_to_https(post['uri'])
-        entry['fm:author'] = account_name(post['author'])
+        entry['fm:author'] = account_name(post['author'], full=True, escape=False)
         entry['fm:avatar'] = post['author']['avatar']
         entry['fm:timestamp'] = post['record']['created_at']
         entry['fm:html'] = post_to_html(entry, doc, line, state, entry['fm:link'])
     elif entry['py_type'] == 'app.bsky.notification.listNotifications#notification':
-        entry['fm:author'] = account_name(entry['author'])
+        entry['fm:author'] = account_name(entry['author'], full=True, escape=False)
         entry['fm:avatar'] = entry['author']['avatar']
         entry['fm:timestamp'] = entry['indexed_at']
         if entry.get('reason_subject'):
