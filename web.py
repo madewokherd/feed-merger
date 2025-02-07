@@ -778,6 +778,27 @@ def handle_atom(url, js, state, data, data_str, tokens):
                     break
             continue
 
+    if js.get('feed'):
+        if 'link' in js:
+            if isinstance(js['link'], list):
+                for item in js['link']:
+                    if item.get('rel', 'alternate') == 'alternate':
+                        js['fm:link'] = item['href']
+            else:
+                js['fm:link'] = js['link']['href']
+        if 'title' in js:
+            if isinstance(js['title'], str):
+                js['fm:title'] = js['title']
+            elif js['title'].get('type', 'text') == 'text':
+                js['fm:title'] = js['title']['inner']
+            elif js['title']['type'] == 'html':
+                js['fm:title'] = html.unescape(js['title']['inner'])
+        if 'author' in js:
+            if 'name' in js['author']:
+                js['fm:author'] = js['author']['name']
+            if 'uri' in js['author']:
+                js['fm:author_link'] = js['author']['uri']
+
     for entry in js.get('fm:entries', []) + [js]:
         if 'link' in entry:
             if isinstance(entry['link'], list):
