@@ -123,6 +123,10 @@ def post_to_html(entry, doc, line, state, url):
             html_parts.append(f'''<p style="white-space: pre-wrap;">Image description: {html.escape(entry['alt'])}</p>''')
     elif entry['py_type'] == 'app.bsky.embed.record#view':
         html_parts.append(post_to_html(entry['record'], doc, line, state, url))
+    elif entry['py_type'] == 'app.bsky.embed.record#viewBlocked':
+        html_parts.append('<p>[blocked]</p>')
+    elif entry['py_type'] == 'app.bsky.embed.record#viewNotFound':
+        html_parts.append('<p>[not found]</p>')
     elif entry['py_type'] == 'app.bsky.embed.external#view':
         html_parts.append(post_to_html(entry['external'], doc, line, state, url))
     elif entry['py_type'] == 'app.bsky.embed.external#viewExternal':
