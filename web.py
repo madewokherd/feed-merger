@@ -463,6 +463,67 @@ def find_favicon(url):
                 return urllib.parse.urljoin(url, attrs['content'])
     return best_link # may be None
 
+def get_author_info(url, author_name, is_author_link=False):
+    result = {}
+    tokens = get_page_tokens(url)
+    classes = ('author', 'headshot', 'head_shot', 'contributor', 'avatar')
+    for i in range(len(tokens)):
+        if tokens[i][0] == STARTTAG and tokens[i][1] == 'a':
+            num_indicators = 0
+            attrs = dict(tokens[i][2])
+            if attrs.get('href'):
+                img_link = None
+                if any(c in attrs['href'].lower() for c in classes):
+                    num_indicators += 1
+                if attrs.get('class') and any(c in attrs['class'].lower() for c in classes):
+                    num_indicators += 1
+                if i + 1 < len(tokens) and tokens[i+1][0] == DATA and author_name in tokens[i+1][1]:
+                    num_indicators += 1
+                if author_name.lower() in urllib.parse.unquote(attrs['href']).lower().replace('-', ' ').replace('_', ' ').replace('%20', ' '):
+                    num_indicators += 1
+                if i + 1 < len(tokens) and tokens[i+1][0] == STARTTAG and tokens[i+1][1] == 'img':
+                    img_attrs = dict(tokens[i+1][2])
+                    if 'class' in img_attrs and any(c in img_attrs['class'].lower() for c in classes):
+                        num_indicators += 1
+                    if 'src' in img_attrs:
+                        img_link = urllib.parse.urljoin(url, img_attrs['src'])
+                        if any(c in img_link.lower() for c in classes):
+                            num_indicators += 1
+                    if 'alt' in img_attrs and author_name in img_attrs['alt']:
+                        num_indicators += 1
+                if num_indicators >= 2:
+                    result['fm:author_link'] = urllib.parse.urljoin(url, attrs['href'])
+                    if img_link:
+                        result['fm:author'] = img_link
+                        break
+        if tokens[i][0] == STARTTAG and tokens[i][1] == 'img':
+            attrs = dict(tokens[i][2])
+            if 'src' in attrs:
+                num_indicators = 0
+                link = urllib.parse.urljoin(url, attrs['src'])
+                if any(c in link.lower() for c in classes):
+                    num_indicators += 1
+                if author_name.lower() in urllib.parse.unquote(link).lower().replace('-', ' ').replace('_', ' ').replace('%20', ' '):
+                    num_indicators += 1
+                if 'alt' in attrs and author_name in attrs['alt']:
+                    num_indicators += 1
+                if 'class' in attrs and any(c in attrs['class'].lower() for c in classes):
+                    num_indicators += 1
+                if num_indicators >= 2:
+                    result['fm:avatar'] = link
+                    break
+        if tokens[i][0] == STARTTAG and tokens[i][1] == 'script' and tokens[i+1][0] == DATA and tokens[i+1][1].startswith('var initialData = ') and is_author_link:
+            ytdata = json.loads(tokens[i+1][1][18:-1])
+            result['fm:avatar'] = ytdata['header']['pageHeaderRenderer']['content']['pageHeaderViewModel']['image']['decoratedAvatarViewModel']['avatar']['avatarViewModel']['image']['sources'][-1]['url']
+            break
+        if tokens[i][0] == STARTTAG and tokens[i][1] == 'meta':
+            attrs = dict(tokens[i][2])
+            if attrs.get('property') == 'og:image' and attrs.get('content') and is_author_link:
+                result['fm:avatar'] = urllib.parse.urljoin(url, attrs['content'])
+                break
+
+    return result
+
 def find_avatars(js):
     authors = {}
     author_links = {}
@@ -482,100 +543,38 @@ def find_avatars(js):
                     entry['fm:author_link'] = author
 
                 if 'fm:author_link' not in entry:
-                    # search page for author link
-                    tokens = get_page_tokens(entry['fm:link'])
-                    author_link = None
-                    avatar_link = None
-                    for i in range(len(tokens)):
-                        if tokens[i][0] == STARTTAG and tokens[i][1] == 'a':
-                            num_indicators = 0
-                            attrs = dict(tokens[i][2])
-                            if attrs.get('href'):
-                                img_link = None
-                                if 'author' in attrs['href'].lower():
-                                    num_indicators += 1
-                                if attrs.get('class') and 'author' in attrs['class']:
-                                    num_indicators += 1
-                                if i + 1 < len(tokens) and tokens[i+1][0] == DATA and author in tokens[i+1][1]:
-                                    num_indicators += 1
-                                if i + 1 < len(tokens) and tokens[i+1][0] == STARTTAG and tokens[i+1][1] == 'img':
-                                    img_attrs = dict(tokens[i+1][2])
-                                    if 'class' in img_attrs and 'author' in img_attrs['class']:
-                                        num_indicators += 1
-                                    if 'src' in img_attrs:
-                                        img_link = img_attrs['src']
-                                        if 'author' in img_link.lower() or 'headshot' in img_link.lower():
-                                            num_indicators += 1
-                                    if 'alt' in img_attrs and author in img_attrs['alt']:
-                                        num_indicators += 1
-                                if num_indicators >= 2:
-                                    author_link = attrs['href']
-                                    if img_link:
-                                        avatar_link = img_link
-                                        break
-                        if tokens[i][0] == STARTTAG and tokens[i][1] == 'img':
-                            attrs = dict(tokens[i][2])
-                            if 'src' in attrs:
-                                num_indicators = 0
-                                link = attrs['src']
-                                if 'author' in link.lower() or 'headshot' in link.lower() or 'head_shot' in link.lower():
-                                    num_indicators += 1
-                                if author.lower() in urllib.parse.unquote(link).lower().replace('-', ' ').replace('_', ' ').replace('%20', ' '):
-                                    num_indicators += 1
-                                if 'alt' in attrs and author in attrs['alt']:
-                                    num_indicators += 1
-                                if 'class' in attrs and 'author' in attrs['class']:
-                                    num_indicators += 1
-                                if num_indicators >= 2:
-                                    avatar_link = authors[author] = link
-                                    break
-                    if avatar_link:
-                        authors[author] = urllib.parse.urljoin(entry['fm:link'], avatar_link)
-                        entry['fm:avatar'] = authors[author]
-                        continue
+                    info = get_author_info(entry['fm:link'], author)
+                    for key in info:
+                        if key not in entry:    
+                            entry[key] = info[key]
 
-                    if author_link:
-                        entry['fm:author_link'] = author_links[author] = author_link = urllib.parse.urljoin(entry['fm:link'], author_link)
+                    if 'fm:author_link' in info:
+                        author_links[author] = info['fm:author_link']
+
+                    if 'fm:avatar' in info:
+                        authors[author] = info['fm:avatar']
+                        continue
 
                 if 'fm:author_link' in entry:
                     # search page for author avatar
-                    tokens = get_page_tokens(entry['fm:author_link'])
-                    for i in range(len(tokens)):
-                        if tokens[i][0] == STARTTAG and tokens[i][1] == 'img':
-                            attrs = dict(tokens[i][2])
-                            if 'src' in attrs:
-                                num_indicators = 0
-                                link = attrs['src']
-                                if 'author' in link.lower() or 'headshot' in link.lower() or 'head_shot' in link.lower():
-                                    num_indicators += 1
-                                if author.lower() in urllib.parse.unquote(link).lower().replace('-', ' ').replace('_', ' ').replace('%20', ' '):
-                                    num_indicators += 1
-                                if 'alt' in attrs and author in attrs['alt']:
-                                    num_indicators += 1
-                                if 'class' in attrs and 'author' in attrs['class']:
-                                    num_indicators += 1
-                                if num_indicators >= 2:
-                                    entry['fm:avatar'] = authors[author] = link
-                                    break
-                        if tokens[i][0] == STARTTAG and tokens[i][1] == 'script' and tokens[i+1][0] == DATA and tokens[i+1][1].startswith('var initialData = '):
-                            ytdata = json.loads(tokens[i+1][1][18:-1])
-                            entry['fm:avatar'] = authors[author] = ytdata['header']['pageHeaderRenderer']['content']['pageHeaderViewModel']['image']['decoratedAvatarViewModel']['avatar']['avatarViewModel']['image']['sources'][-1]['url']
-                            break
-                        if tokens[i][0] == STARTTAG and tokens[i][1] == 'meta':
-                            attrs = dict(tokens[i][2])
-                            if attrs.get('property') == 'og:image' and attrs.get('content'):
-                                entry['fm:avatar'] = authors[author] = attrs['content']
-                                break
-                    else:
-                        authors[author] = None
+                    info = get_author_info(entry['fm:author_link'], author, is_author_link=True)
+                    for key in info:
+                        if key not in entry:    
+                            entry[key] = info[key]
+
+                    if 'fm:avatar' in info:
+                        authors[author] = info['fm:avatar']
+                        continue
 
     if any('fm:avatar' not in x for x in js.get('fm:entries', ())) and js.get('fm:link'):
-        favicon = find_favicon(js['fm:link'])
-        if favicon:
-            js['fm:avatar'] = favicon
+        if not js.get('fm:avatar'):
+            favicon = find_favicon(js['fm:link'])
+            if favicon:
+                js['fm:avatar'] = favicon
+        if js.get('fm:avatar'):
             for entry in js['fm:entries']:
                 if 'fm:avatar' not in entry:
-                    entry['fm:avatar'] = favicon
+                    entry['fm:avatar'] = js['fm:avatar']
 
 def handle_rss(url, js, state, data, data_str, tokens):
     prev_latest = state.get(('rss', url, 'latest'))
