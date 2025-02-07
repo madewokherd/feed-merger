@@ -434,7 +434,12 @@ def handle_mrss(entry):
 def find_favicon(url):
     best_link = None
     best_size = -1
-    tokens = get_page_tokens(url)
+    try:
+        tokens = get_page_tokens(url)
+    except urllib.error.HTTPError:
+        return None
+    except urllib.error.URLError:
+        return None
     for token in tokens:
         if token[0] == STARTTAG and token[1] == 'link':
             attrs = dict(token[2])
