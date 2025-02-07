@@ -15,7 +15,7 @@ import core
 
 from html import escape as e
 
-_USER_AGENT = f"{sys.platform}:feed-merger:v1 (by /u/migratingwoks)"
+_USER_AGENT = f"{sys.platform}:feed-merger:v2 (by /u/migratingwoks)"
 
 _oauth_error = None
 _oauth_state = None
@@ -158,6 +158,37 @@ def process_entry(entry, state, items):
 
     return True
 
+def get_author_avatars(state, j):
+    authors = set()
+    for entry in j.get('fm:entries', ()):
+        if entry.get('author'):
+            authors.add(entry['author'])
+
+    if not authors:
+        return
+
+    avatars = {}
+    for author in authors:
+        url = f"https://oauth.reddit.com/user/{author}/about"
+
+        query_dict = {
+            'raw_json': 1,
+        }
+
+        query_str = urllib.parse.urlencode(query_dict)
+        url = urllib.parse.urlparse(url)._replace(query=query_str).geturl()
+
+        res = api_request(state, url)
+
+        if res and 'data' in res and 'icon_img' in res['data']:
+            avatars[author] = res['data']['icon_img']
+        else:
+            print(res)
+
+    for entry in j.get('fm:entries', ()):
+        if entry.get('author') and entry['author'] in avatars:
+            entry['fm:avatar'] = avatars[entry['author']]
+
 def process_search_links(query, state, items):
     latest = state.get(('reddit', 'search', 'links', query, 'latest'))
     new_latest = None
@@ -211,6 +242,8 @@ def process_search_links(query, state, items):
             break
 
         query_dict['after'] = j['after']
+
+    get_author_avatars(state, result)
 
     state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
 
