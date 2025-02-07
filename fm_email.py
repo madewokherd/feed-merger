@@ -2,8 +2,11 @@ import base64
 import datetime
 import dns.resolver
 import email.policy
+import hashlib
 import html
 import json
+import urllib.parse
+import urllib.request
 
 import publicsuffixlist
 
@@ -62,6 +65,12 @@ def avatar_from_bimi_domain(suffix, selector="default"):
     except dns.resolver.NXDOMAIN:
         pass
 
+def gravatar_for_email(addr, default):
+    email_encoded = addr.lower().encode('utf-8')
+    email_hash = hashlib.sha256(email_encoded).hexdigest()
+    query_params = urllib.parse.urlencode({'d': default})
+    return f"https://www.gravatar.com/avatar/{email_hash}?{query_params}"
+
 def format_message(msg, format_html=False):
     result = {}
 
@@ -115,26 +124,47 @@ def format_message(msg, format_html=False):
             result['fm:avatar'] = result['email:inboxmarkup']['entity']['avatar_image_url']
 
     if 'fm:avatar' not in result and 'from' in msg:
+        avatar = None
+
         from_addr = msg['from'].rsplit(' <', 1)[-1].strip().rstrip('>')
 
         from_host = from_addr.rsplit('@', 1)[1]
 
-        # bimi
-        if 'bimi-selector' in msg:
-            selector = msg['bimi-selector']
-        else:
-            selector = 'default'
+        if not avatar:
+            # bimi
+            if 'bimi-selector' in msg:
+                selector = msg['bimi-selector']
+            else:
+                selector = 'default'
 
-        bimi_avatar = avatar_from_bimi_domain(from_host, selector)
+            avatar = avatar_from_bimi_domain(from_host, selector)
 
-        if not bimi_avatar:
+        if not avatar:
             org_domain = psl.privatesuffix(from_host)
 
             if org_domain != from_host:
-                bimi_avatar = avatar_from_bimi_domain(org_domain, selector)
+                avatar = avatar_from_bimi_domain(org_domain, selector)
 
-        if bimi_avatar:
-            result['fm:avatar'] = bimi_avatar
+        if not avatar:
+            gravatar_url = gravatar_for_email(from_addr, '404')
+            try:
+                req = urllib.request.Request(gravatar_url, method='HEAD')
+                urllib.request.urlopen(req)
+            except urllib.error.HTTPError:
+                pass
+            else:
+                avatar = gravatar_url
+
+        if not avatar:
+            avatar = web.find_favicon(f'https://{from_host}/')
+
+        if not avatar:
+            avatar = web.find_favicon(f'https://www.{from_host}/')
+
+        if not avatar:
+            avatar = gravatar_for_email(from_addr, 'monsterid')
+
+        result['fm:avatar'] = avatar
 
     return result
 
