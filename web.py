@@ -494,7 +494,7 @@ def get_author_info(url, author_name, is_author_link=False):
                 if num_indicators >= 2:
                     result['fm:author_link'] = urllib.parse.urljoin(url, attrs['href'])
                     if img_link:
-                        result['fm:author'] = img_link
+                        result['fm:avatar'] = img_link
                         break
         if tokens[i][0] == STARTTAG and tokens[i][1] == 'img':
             attrs = dict(tokens[i][2])
