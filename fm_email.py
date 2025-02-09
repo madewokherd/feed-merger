@@ -49,6 +49,17 @@ def format_content(msg):
 
     return '\n'.join(html_parts)
 
+def extract_nextdoor_avatar(html_data):
+    parser = web.HtmlTokenizer()
+    parser.feed(html_data)
+    tokens = parser.tokens
+
+    for token in tokens:
+        if token[0] == web.STARTTAG and token[1] == 'img':
+            attrs = dict(token[2])
+            if attrs.get('alt', '').endswith('s profile photo') and attrs.get('src', '').endswith('.crop20x20.jpg'):
+                return attrs['src'].replace('.crop20x20.jpg', '.crop96x96.jpg')
+
 def avatar_from_bimi_domain(suffix, selector="default"):
     try:
         bimi_answer = dns.resolver.query(f'{selector}._bimi.{suffix}', 'TXT')
@@ -127,6 +138,9 @@ def format_message(msg, format_html=False):
         avatar = None
 
         from_addr = msg['from'].rsplit(' <', 1)[-1].strip().rstrip('>')
+
+        if from_addr == "reply@ss.email.nextdoor.com":
+            avatar = extract_nextdoor_avatar(result['fm:html'])
 
         from_host = from_addr.rsplit('@', 1)[1]
 
