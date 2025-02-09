@@ -794,9 +794,9 @@ def handle_atom(url, js, state, data, data_str, tokens):
             elif js['title']['type'] == 'html':
                 js['fm:title'] = html.unescape(js['title']['inner'])
         if 'author' in js:
-            if 'name' in js['author']:
+            if js['author'].get('name'):
                 js['fm:author'] = js['author']['name']
-            if 'uri' in js['author']:
+            if js['author'].get('uri'):
                 js['fm:author_link'] = js['author']['uri']
 
     for entry in js.get('fm:entries', []) + [js]:
@@ -823,9 +823,9 @@ def handle_atom(url, js, state, data, data_str, tokens):
                 if 'xml:base' in content and entry is not js:
                     entry['fm:base'] = content['xml:base']
         if 'author' in entry:
-            if 'name' in entry['author']:
+            if entry['author'].get('name'):
                 entry['fm:author'] = entry['author']['name']
-            if 'uri' in entry['author']:
+            if entry['author'].get('uri'):
                 entry['fm:author_link'] = entry['author']['uri']
         if 'published' in entry or 'updated' in entry:
             entry['fm:timestamp'] = datetime.datetime.fromisoformat(entry.get('published', entry.get('updated'))).astimezone(datetime.timezone.utc).isoformat()
