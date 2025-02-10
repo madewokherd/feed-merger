@@ -498,9 +498,13 @@ def get_author_info(url, author_name, is_author_link=False):
                         break
         if tokens[i][0] == STARTTAG and tokens[i][1] == 'img':
             attrs = dict(tokens[i][2])
+            link = None
             if 'src' in attrs:
-                num_indicators = 0
                 link = urllib.parse.urljoin(url, attrs['src'])
+            elif 'data-src' in attrs:
+                link = urllib.parse.urljoin(url, attrs['data-src'])
+            if link:
+                num_indicators = 0
                 if any(c in link.lower() for c in classes):
                     num_indicators += 1
                 if author_name.lower() in urllib.parse.unquote(link).lower().replace('-', ' ').replace('_', ' ').replace('%20', ' '):
