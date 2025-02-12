@@ -141,6 +141,8 @@ def format_message(msg, format_html=False):
 
         if from_addr == "reply@ss.email.nextdoor.com":
             avatar = extract_nextdoor_avatar(result['fm:html'])
+        elif headers.get('x-github-sender'):
+            avatar = f'https://github.com/{urllib.parse.quote(headers['x-github-sender'][0])}.png'
 
         from_host = from_addr.rsplit('@', 1)[1]
 
