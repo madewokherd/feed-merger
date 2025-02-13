@@ -178,7 +178,13 @@ def get_author_avatars(state, j):
         query_str = urllib.parse.urlencode(query_dict)
         url = urllib.parse.urlparse(url)._replace(query=query_str).geturl()
 
-        res = api_request(state, url)
+        try:
+            res = api_request(state, url)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                continue
+            else:
+                raise
 
         if res and 'data' in res and 'icon_img' in res['data']:
             avatars[author] = res['data']['icon_img']
