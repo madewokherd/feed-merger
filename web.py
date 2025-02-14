@@ -466,7 +466,10 @@ def find_favicon(url):
 def get_author_info(url, author_name, is_author_link=False):
     result = {}
     tokens = get_page_tokens(url)
-    classes = ('author', 'headshot', 'head_shot', 'contributor', 'avatar')
+    if is_author_link:
+        classes = ('author', 'headshot', 'head_shot', 'contributor', 'avatar')
+    else:
+        classes = ('author', 'headshot', 'head_shot')
     for i in range(len(tokens)):
         if tokens[i][0] == STARTTAG and tokens[i][1] == 'a':
             num_indicators = 0
