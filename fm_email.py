@@ -60,6 +60,17 @@ def extract_nextdoor_avatar(html_data):
             if attrs.get('alt', '').endswith('s profile photo') and attrs.get('src', '').endswith('.crop20x20.jpg'):
                 return attrs['src'].replace('.crop20x20.jpg', '.crop96x96.jpg')
 
+def extract_patreon_avatar(html_data):
+    parser = web.HtmlTokenizer()
+    parser.feed(html_data)
+    tokens = parser.tokens
+
+    for token in tokens:
+        if token[0] == web.STARTTAG and token[1] == 'img':
+            attrs = dict(token[2])
+            if '/patreon-media/p/campaign/' in attrs.get('src', ''):
+                return attrs['src']
+
 def avatar_from_bimi_domain(suffix, selector="default"):
     try:
         bimi_answer = dns.resolver.query(f'{selector}._bimi.{suffix}', 'TXT')
@@ -145,6 +156,9 @@ def format_message(msg, format_html=False):
             avatar = f'https://github.com/{urllib.parse.quote(headers['x-github-sender'][0])}.png'
 
         from_host = from_addr.rsplit('@', 1)[1]
+
+        if from_host == 'patreon.com':
+            avatar = extract_patreon_avatar(result['fm:html'])
 
         if not avatar:
             # bimi
