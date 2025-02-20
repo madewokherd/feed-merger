@@ -4,6 +4,7 @@ import urllib.parse
 import urllib.request
 
 import core
+import fm_email
 
 from html import escape as e
 
@@ -107,6 +108,10 @@ def process_branch(line, state, items):
             commit['fm:link'] = commit['web_url']
             commit['fm:author'] = commit['author_name']
             commit['fm:timestamp'] = commit['created_at']
+
+            avatar = fm_email.get_avatar(commit['author_email'])
+            if avatar:
+                commit['fm:avatar'] = avatar
 
         if not since or len(j) < 100:
             break
