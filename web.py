@@ -443,7 +443,7 @@ def find_favicon(url):
     for token in tokens:
         if token[0] == STARTTAG and token[1] == 'link':
             attrs = dict(token[2])
-            if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon"):
+            if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon") and 'href' in attrs:
                 if 'sizes' in attrs:
                     if attrs['sizes'] == 'any':
                         this_size = "any"
