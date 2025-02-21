@@ -33,11 +33,18 @@ def to_json(obj):
         for i in obj:
             result.append(to_json(i))
         return result
-    if type(obj) in (dict, str, int, float, bool) or obj is None:
+    if type(obj) in (str, int, float, bool) or obj is None:
         return obj
-    result = dict(obj)
-    for key in list(result.keys()):
-        result[key] = to_json(result[key])
+    if hasattr(obj, 'to_dict'):
+        obj = obj.to_dict()
+    if type(obj) is dict:
+        result = {}
+        for key in obj:
+            result[key] = to_json(obj[key])
+        return result
+    result = {}
+    for (key, value) in obj:
+        result[key] = to_json(value)
     return result
 
 def uri_to_https(uri):
