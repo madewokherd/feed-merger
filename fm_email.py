@@ -71,7 +71,14 @@ def extract_patreon_avatar(html_data):
             if '/patreon-media/p/campaign/' in attrs.get('src', ''):
                 return attrs['src']
 
+bimi_cache = {}
+
 def avatar_from_bimi_domain(suffix, selector="default"):
+    if (suffix, selector) in bimi_cache:
+        return bimi_cache[suffix, selector]
+
+    result = None
+
     try:
         bimi_answer = dns.resolver.query(f'{selector}._bimi.{suffix}', 'TXT')
 
@@ -81,14 +88,23 @@ def avatar_from_bimi_domain(suffix, selector="default"):
             if 'v=BIMI1' in terms:
                 for term in terms:
                     if term.startswith('l='):
-                        return term[2:]
+                        result = term[2:]
+                        break
     except dns.resolver.NoAnswer:
         pass
     except dns.resolver.NXDOMAIN:
         pass
 
+    bimi_cache[suffix, selector] = result
+    return result
+
+avatar_cache = {}
+
 def get_avatar(from_addr, selector="default"):
     from_host = from_addr.rsplit('@', 1)[1]
+
+    if (from_addr, selector) in avatar_cache:
+        return avatar_cache[from_addr, selector]
 
     avatar = avatar_from_bimi_domain(from_host, selector)
 
@@ -116,6 +132,8 @@ def get_avatar(from_addr, selector="default"):
 
     if not avatar:
         avatar = gravatar_for_email(from_addr, 'monsterid')
+
+    avatar_cache[from_addr, selector] = avatar
 
     return avatar
 

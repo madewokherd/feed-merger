@@ -431,36 +431,46 @@ def handle_mrss(entry):
                 entry['fm:thumbnail'] = content['url']
                 break
 
+favicon_cache = {}
+
 def find_favicon(url):
+    if url in favicon_cache:
+        return favicon_cache[url]
+
     best_link = None
     best_size = -1
     try:
         tokens = get_page_tokens(url)
     except urllib.error.HTTPError:
-        return None
+        pass
     except urllib.error.URLError:
-        return None
-    for token in tokens:
-        if token[0] == STARTTAG and token[1] == 'link':
-            attrs = dict(token[2])
-            if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon") and 'href' in attrs:
-                if 'sizes' in attrs:
-                    if attrs['sizes'] == 'any':
-                        this_size = "any"
+        pass
+    else:
+        for token in tokens:
+            if token[0] == STARTTAG and token[1] == 'link':
+                attrs = dict(token[2])
+                if attrs.get('rel') in ("icon", "shortcut icon", "apple-touch-icon") and 'href' in attrs:
+                    if 'sizes' in attrs:
+                        if attrs['sizes'] == 'any':
+                            this_size = "any"
+                        else:
+                            this_size = int(attrs['sizes'].split('x')[0])
+                    elif attrs['rel'] == 'apple-touch-icon':
+                        this_size = 192
                     else:
-                        this_size = int(attrs['sizes'].split('x')[0])
-                elif attrs['rel'] == 'apple-touch-icon':
-                    this_size = 192
-                else:
-                    this_size = 16
-                if this_size != "any" and this_size > best_size:
-                    best_size = this_size
-                    best_link = urllib.parse.urljoin(url, attrs['href'])
-        if token[0] == STARTTAG and token[1] == 'meta':
-            attrs = dict(token[2])
-            if attrs.get('name') == 'parsely-image-url':
-                # tumblr uses this for the user avatar, so prefer it
-                return urllib.parse.urljoin(url, attrs['content'])
+                        this_size = 16
+                    if this_size != "any" and this_size > best_size:
+                        best_size = this_size
+                        best_link = urllib.parse.urljoin(url, attrs['href'])
+            if token[0] == STARTTAG and token[1] == 'meta':
+                attrs = dict(token[2])
+                if attrs.get('name') == 'parsely-image-url':
+                    # tumblr uses this for the user avatar, so prefer it
+                    best_link = urllib.parse.urljoin(url, attrs['content'])
+                    break
+
+    favicon_cache[url] = best_link
+
     return best_link # may be None
 
 def get_author_info(url, author_name, is_author_link=False):
