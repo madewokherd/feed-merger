@@ -526,6 +526,9 @@ def get_author_info(url, author_name, is_author_link=False):
                     num_indicators += 1
                 if 'class' in attrs and any(c in attrs['class'].lower() for c in classes):
                     num_indicators += 1
+                if is_author_link and attrs.get('data-testid') == 'ProfileImage':
+                    #linktr.ee
+                    num_indicators += 2
                 if num_indicators >= 2:
                     result['fm:avatar'] = link
                     break
@@ -537,7 +540,6 @@ def get_author_info(url, author_name, is_author_link=False):
             attrs = dict(tokens[i][2])
             if attrs.get('property') == 'og:image' and attrs.get('content') and is_author_link:
                 result['fm:avatar'] = urllib.parse.urljoin(url, attrs['content'])
-                break
 
     return result
 
