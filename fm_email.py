@@ -71,6 +71,30 @@ def extract_patreon_avatar(html_data):
             if '/patreon-media/p/campaign/' in attrs.get('src', ''):
                 return attrs['src']
 
+def extract_bandcamp_info(html_data):
+    result = {}
+
+    parser = web.HtmlTokenizer()
+    parser.feed(html_data)
+    tokens = parser.tokens
+
+    for i in range(len(tokens)-1):
+        token = tokens[i]
+        if token[0] == web.STARTTAG and token[1] == 'a' and tokens[i+1][0] == web.DATA and tokens[i+1][1] == 'check it out here':
+            attrs = dict(token[2])
+            if attrs.get('href'):
+                result['fm:link'] = attrs['href']
+
+    if 'fm:link' in result:
+        tokens = web.get_page_tokens(result['fm:link'])
+        for token in tokens:
+            if token[0] == web.STARTTAG and token[1] == 'img':
+                attrs = dict(token[2])
+                if attrs.get('class') == 'band-photo' and attrs.get('src'):
+                    result['fm:avatar'] = attrs['src']
+
+    return result
+
 bimi_cache = {}
 
 def avatar_from_bimi_domain(suffix, selector="default"):
@@ -202,6 +226,10 @@ def format_message(msg, format_html=False):
 
         if from_addr == "reply@ss.email.nextdoor.com":
             avatar = extract_nextdoor_avatar(result['fm:html'])
+        elif from_addr == "noreply@bandcamp.com":
+            info = extract_bandcamp_info(result['fm:html'])
+            avatar = info.get('fm:avatar')
+            result.update(info)
         elif headers.get('x-github-sender'):
             avatar = f'https://github.com/{urllib.parse.quote(headers['x-github-sender'][0])}.png'
 
