@@ -35,7 +35,7 @@ class HtmlTokenizer(html.parser.HTMLParser):
         self.tokens.append((DATA, data, None))
 
     def handle_comment(self, data):
-        self.tokens.append((DATA, data, None))
+        self.tokens.append((COMMENT, data, None))
 
     def handle_decl(self, decl):
         self.tokens.append((DECL, decl, None))
