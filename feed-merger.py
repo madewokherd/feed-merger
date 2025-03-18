@@ -381,6 +381,7 @@ else:
         f.write(descfilename)
 
         f.write("""</title>
+          <style>img { max-height: 100vh; max-width: 100vw; }</style>
           </head>
           <body>
         """)
