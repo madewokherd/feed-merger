@@ -95,22 +95,24 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
         else:
             raise Exception(f"template has unknown processing instruction {name}")
 
-def items_from_json(j, items):
-    if 'fm:entries' in j:
-        for entry in j['fm:entries']:
-            try:
-                template_filler = HtmlTemplateFiller({
-                    'e': entry,
-                    'f': j,
-                })
-                template_filler.feed(entry_template)
-                template_filler.close()
+def item_from_json(entry):
+    template_filler = HtmlTemplateFiller({
+        'e': entry,
+        'f': entry.get('fm:feed', {}),
+    })
+    template_filler.feed(entry_template)
+    template_filler.close()
 
-                items.append((template_filler.get_contents(), entry['fm:timestamp']))
-            except:
-                print("Failed processing json")
-                print(json.dumps(entry, indent=2))
-                traceback.print_exc()
+    return template_filler.get_contents(), entry['fm:timestamp']
+
+def items_from_entries(items):
+    for entry in entries:
+        try:
+            items.append(item_from_json(entry))
+        except:
+            print("Failed processing json")
+            print(json.dumps(entry, indent=2))
+            traceback.print_exc()
 
 _BODY_STYLES = {
     'alink': 'div.styleID a:active { color: VAL; } ',
@@ -229,6 +231,7 @@ def translate_html(feed, entry, data):
     return parser.get_contents()
 
 def handle_line(line):
+    global entries
     if line.startswith('mastodon:'):
         import mastodon
         return mastodon.process(line, state)
@@ -268,6 +271,10 @@ def handle_line(line):
     elif line.startswith('custom:'):
         modulename = line.split(':', 2)[1]
         return __import__(modulename).process(line, state)
+    elif line.startswith('filter-out:'):
+        fun = eval(f'lambda e: {line[11:]}')
+        entries = [entry for entry in entries if not fun(entry)]
+        return core.SUCCESS, None
     elif line.startswith('bluesky:'):
         import bluesky
         return bluesky.process(line, state)
@@ -311,13 +318,24 @@ def add_defaults(line, j):
         item_counter += 1
         entry['fm:counter'] = item_counter
 
+def entries_from_json(j):
+    if not 'fm:entries' in j:
+        return
+    feed = j
+    entry_list = j['fm:entries']
+    del j['fm:entries']
+    for entry in entry_list:
+        if j:
+            entry['fm:feed'] = j
+        entries.append(entry)
+
 def process_line(line):
     disposition, data = handle_line(line)
     while disposition == core.REDIRECT:
         disposition, data = handle_line(data)
     if disposition == core.JSON:
         add_defaults(line, data)
-        items_from_json(data, items)
+        entries_from_json(data)
     elif disposition != core.SUCCESS:
         raise Exception("unrecognized disposition")
 
@@ -334,6 +352,7 @@ def process_file(descfilename):
 descfilename = sys.argv[1]
 output_filename = sys.argv[2]
 
+entries = []
 items = []
 
 try:
@@ -357,7 +376,9 @@ if output_filename == 'debug':
         add_defaults(line, data)
         print()
         print()
-        items_from_json(data, items)
+        entries_from_json(data)
+
+    items_from_entries(items)
 
     print("stored data:", state)
     print()
@@ -367,6 +388,8 @@ if output_filename == 'debug':
         print(item[1], item[0])
 else:
     process_line(descfilename)
+
+    items_from_entries(items)
 
     items.sort(key = lambda i: i[1])
 
