@@ -46,7 +46,10 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
             self.strs.append(' ')
             self.strs.append(key)
             self.strs.append('="')
-            self.strs.append(html.escape(str(eval(f'f"""{value}"""', globals(), self.locals_dict))))
+            try:
+                self.strs.append(html.escape(str(eval(f'f"""{value}"""', globals(), self.locals_dict))))
+            except Exception as exc:
+                self.strs.append(html.escape(str(exc)))
             self.strs.append('"')
 
         if close:
@@ -69,7 +72,10 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
         if not self.output_enabled:
             return
 
-        self.strs.append(html.escape(str(eval(f'f"""{data}"""', globals(), self.locals_dict))))
+        try:
+            self.strs.append(html.escape(str(eval(f'f"""{data}"""', globals(), self.locals_dict))))
+        except Exception as exc:
+            self.strs.append(html.escape(str(exc)))
 
     def handle_pi(self, data):
         if ' ' in data:
@@ -81,7 +87,11 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
         if name == 'if':
             self.stack.append(('if', self.output_enabled))
             if self.output_enabled:
-                self.output_enabled = bool(eval(rest, globals(), self.locals_dict))
+                try:
+                    self.output_enabled = bool(eval(rest, globals(), self.locals_dict))
+                except Exception as exc:
+                    self.output_enabled = False
+                    self.strs.append(html.escape(str(exc)))
         elif name == 'endif':
             name, output_enabled = self.stack.pop()
             if name != 'if':
@@ -91,7 +101,10 @@ class HtmlTemplateFiller(html.parser.HTMLParser):
             if not self.output_enabled:
                 return
 
-            self.strs.append(str(eval(f'f"""{rest}"""', globals(), self.locals_dict)))
+            try:
+                self.strs.append(str(eval(f'f"""{rest}"""', globals(), self.locals_dict)))
+            except Exception as exc:
+                self.strs.append(html.escape(str(exc)))
         else:
             raise Exception(f"template has unknown processing instruction {name}")
 
