@@ -233,6 +233,7 @@ def process_timeline(line, state):
                 j['feed'].pop(-1)
 
     j['fm:entries'] = j['feed']
+    del j['feed']
 
     for entry in j['fm:entries']:
         translate_entry(entry, j, line, state)
@@ -264,6 +265,7 @@ def process_notifications(line, state):
                 j['notifications'].pop(-1)
 
     j['fm:entries'] = j['notifications']
+    del j['notifications']
     for entry in j['fm:entries']:
         translate_entry(entry, j, line, state)
 
