@@ -210,11 +210,40 @@ def get_indexed_at(entry):
         return entry['reason']['indexed_at']
     return entry['post']['indexed_at']
 
+def is_unfollowed_reply(post):
+    if not post.get('reply'):
+        return False
+
+    if post.get('reason'):
+        # probably a repost, can refine this later if needed
+        return False
+
+    reply = post['reply']
+
+    root_author = reply.get('root', {}).get('author', {}).get('viewer')
+    if root_author and not root_author.get('following'):
+        return True
+
+    parent_author = reply.get('parent', {}).get('author', {}).get('viewer')
+    if parent_author and not parent_author.get('following'):
+        return True
+
+    gpa = reply.get('grandparentAuthor')
+    if gpa and not gpa.get('following'):
+        return True
+
+    return False
+
 def process_timeline(line, state):
     client = get_client(state)
 
     prev_last_indexed = state.get(('bluesky', 'last_indexed'))
     new_last_indexed = None
+
+    parsed = urllib.parse.urlparse(line)
+    query = urllib.parse.parse_qs(parsed.query)
+
+    filter_replies = (query.get('filter_replies', '0') != '0')
 
     j = to_json(client.get_timeline())
 
@@ -237,6 +266,9 @@ def process_timeline(line, state):
 
     for entry in j['fm:entries']:
         translate_entry(entry, j, line, state)
+
+    if filter_replies:
+        j['fm:entries'] = [entry for entry in j['fm:entries'] if not is_unfollowed_reply(entry)]
 
     state['bluesky', 'last_indexed'] = new_last_indexed
 
