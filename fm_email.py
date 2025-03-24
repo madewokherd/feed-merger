@@ -86,12 +86,15 @@ def extract_bandcamp_info(html_data):
                 result['fm:link'] = attrs['href']
 
     if 'fm:link' in result:
-        tokens = web.get_page_tokens(result['fm:link'])
-        for token in tokens:
-            if token[0] == web.STARTTAG and token[1] == 'img':
-                attrs = dict(token[2])
-                if attrs.get('class') == 'band-photo' and attrs.get('src'):
-                    result['fm:avatar'] = attrs['src']
+        try:
+            tokens = web.get_page_tokens(result['fm:link'])
+            for token in tokens:
+                if token[0] == web.STARTTAG and token[1] == 'img':
+                    attrs = dict(token[2])
+                    if attrs.get('class') == 'band-photo' and attrs.get('src'):
+                        result['fm:avatar'] = attrs['src']
+        except:
+            pass
 
     return result
 
