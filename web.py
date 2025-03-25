@@ -777,7 +777,7 @@ def handle_atom(url, js, state, data, data_str, tokens):
             while True:
                 old_tag, old_dict = stack.pop()
 
-                if old_tag != 'item':
+                if old_tag != 'entry':
                     if len(old_dict) == 1 and 'inner' in old_dict:
                         val = old_dict['inner']
                     else:
