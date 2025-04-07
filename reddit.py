@@ -251,6 +251,8 @@ def process_search_links(query, state, items):
 
     get_author_avatars(state, result)
 
+    del json['data']
+
     state['reddit', 'search', 'links', query, 'latest'] = new_latest or latest
 
     return core.JSON, result

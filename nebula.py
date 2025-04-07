@@ -50,6 +50,8 @@ def process(line, state, items):
 
         break
 
+    del result['results']
+
     state[('nebula', url, 'since_timestamp')] = recent_timestamp or since_timestamp
 
     return core.JSON, result
