@@ -67,12 +67,19 @@ def account_name(acct, full=False, escape=True):
             result = f'{acct['display_name']} - {acct['handle']}'
         else:
             result = acct['display_name']
-    else:
+    elif 'handle' in acct:
         result = acct['handle']
+    else:
+        result = repr(acct)
     if escape:
         return html.escape(result)
     else:
         return result
+
+def smolname(author):
+    if author.get('avatar'):
+        return f'<img src="{author['avatar']}" width=16 height=16> {account_name(author)}'
+    return account_name(author)
 
 def post_to_html(entry, doc, line, state, url):
     html_parts = []
@@ -82,10 +89,10 @@ def post_to_html(entry, doc, line, state, url):
             reason = entry['reason']['py_type']
             if reason == 'app.bsky.feed.defs#reasonRepost':
                 entry['fm:timestamp'] = entry['reason']['indexed_at']
-                html_parts.append(f'''<p><img src="{entry['reason']['by']['avatar']}" width=16 height=16> {account_name(entry['reason']['by'])} reposted:</p>''')
+                html_parts.append(f'''<p>{smolname(entry['reason']['by'])} reposted:</p>''')
 
         if entry.get('reply') and entry['reply'].get('parent') and entry['reply']['parent'].get('author'):
-            html_parts.append(f'''<details><summary><a href="{uri_to_https(entry['reply']['parent']['uri'])}">In reply to</a> <img src="{entry['reply']['parent']['author']['avatar']}" width=16 height=16> {account_name(entry['reply']['parent']['author'])}</summary><blockquote>{post_to_html(entry['reply']['parent'], doc, line, state, url)}</blockquote></details>''')
+            html_parts.append(f'''<details><summary><a href="{uri_to_https(entry['reply']['parent']['uri'])}">In reply to</a> {smolname(entry['reply']['parent']['author'])}</summary><blockquote>{post_to_html(entry['reply']['parent'], doc, line, state, url)}</blockquote></details>''')
 
         if entry.get('post'):
             html_parts.append(post_to_html(entry['post'], doc, line, state, url))
@@ -118,7 +125,7 @@ def post_to_html(entry, doc, line, state, url):
         url = uri_to_https(entry['uri'])
 
         if entry.get('value'):
-            html_parts.append(f'''<p><a href="{uri_to_https(entry['uri'])}">Embedded post</a> by <img src="{entry['author']['avatar']}" width=16 height=16> {account_name(entry['author'])}</p>''')
+            html_parts.append(f'''<p><a href="{uri_to_https(entry['uri'])}">Embedded post</a> by {smolname(entry['author'])}</p>''')
             html_parts.append(f'''<blockquote style="white-space: pre-wrap;">{post_to_html(entry['value'], doc, line, state, url)}</blockquote>''')
     elif entry['py_type'] == 'app.bsky.embed.images#view':
         for image in entry['images']:
@@ -150,7 +157,7 @@ def post_to_html(entry, doc, line, state, url):
         html_parts.append('<p>[video]</p>')
         html_parts.append(f'''<p><a href="{url}"><img src="{entry['thumbnail']}" style="max-height: 100vh; max-width: 100vw"></a></p>''')
     elif entry['py_type'] == 'app.bsky.graph.defs#starterPackViewBasic':
-        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}">starter pack</a> by <img src="{entry['creator']['avatar']}" width=16 height=16> {account_name(entry['creator'])}</p>''')
+        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}">starter pack</a> by {smolname(entry['creator'])}</p>''')
         if entry.get('record'):
             html_parts.append(post_to_html(entry['record'], doc, line, state, url))
     elif entry['py_type'] == 'app.bsky.graph.starterpack':
@@ -159,13 +166,13 @@ def post_to_html(entry, doc, line, state, url):
         if entry.get('description'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['description'])}</p>''')
     elif entry['py_type'] == 'app.bsky.feed.defs#generatorView':
-        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}>feed</a> by <img src="{entry['creator']['avatar']}" width=32 height=32> {account_name(entry['creator'])}:</p>''')
+        html_parts.append(f'''<p>Embedded <a href="{uri_to_https(entry['uri'])}>feed</a> by {smolname(entry['creator'])}:</p>''')
         if entry.get('display_name'):
             html_parts.append(f'''<p>{html.escape(entry['display_name'])}</p>''')
         if entry.get('description'):
             html_parts.append(f'''<p style="white-space: pre-wrap;">{html.escape(entry['description'])}</p>''')
     else:
-        print(f"Unknown bluesky object type: {entry['py_type']}")
+        html_parts.append(f"<p>Unknown bluesky object type: {html.escape(repr(entry))}</p>")
 
     return '\n'.join(html_parts)
 
@@ -174,12 +181,14 @@ def translate_entry(entry, doc, line, state):
         post = entry['post']
         entry['fm:link'] = uri_to_https(post['uri'])
         entry['fm:author'] = account_name(post['author'], full=True, escape=False)
-        entry['fm:avatar'] = post['author']['avatar']
+        if post.get('author', {}).get('avatar'):
+            entry['fm:avatar'] = post['author']['avatar']
         entry['fm:timestamp'] = post['record']['created_at']
         entry['fm:html'] = post_to_html(entry, doc, line, state, entry['fm:link'])
     elif entry['py_type'] == 'app.bsky.notification.listNotifications#notification':
         entry['fm:author'] = account_name(entry['author'], full=True, escape=False)
-        entry['fm:avatar'] = entry['author']['avatar']
+        if entry['author'].get('avatar'):
+            entry['fm:avatar'] = entry['author']['avatar']
         entry['fm:timestamp'] = entry['indexed_at']
         if entry.get('reason_subject'):
             entry['fm:link'] = uri_to_https(entry['reason_subject'])
