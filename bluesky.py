@@ -3,17 +3,18 @@ import html
 import urllib.parse
 
 import atproto
+import atproto.exceptions
 
 import core
 
 client = None
 
-def get_client(state):
+def get_client(state, force=False):
     global client
-    if client is None:
+    if client is None or force:
         client = atproto.Client()
 
-        if ('bluesky', 'session') in state:
+        if ('bluesky', 'session') in state and not force:
             client.login(session_string = state['bluesky', 'session'])
         else:
             username = input("Enter bluesky username: ")
@@ -254,7 +255,14 @@ def process_timeline(line, state):
 
     filter_replies = (query.get('filter_replies', '0') != '0')
 
-    j = to_json(client.get_timeline())
+    try:
+        j = to_json(client.get_timeline())
+    except atproto.exceptions.BadRequestError as e:
+        if e.response.status_code == 400:
+            client = get_client(state, True)
+            j = to_json(client.get_timeline())
+        else:
+            raise
 
     if j.get('feed'):
         new_last_indexed = get_indexed_at(j['feed'][0])
@@ -289,7 +297,14 @@ def process_notifications(line, state):
     prev_last_indexed = state.get(('bluesky-notifications', 'last_indexed'))
     new_last_indexed = None
 
-    j = to_json(client.app.bsky.notification.list_notifications())
+    try:
+        j = to_json(client.app.bsky.notification.list_notifications())
+    except atproto.exceptions.BadRequestError as e:
+        if e.response.status_code == 400:
+            client = get_client(state, True)
+            j = to_json(client.app.bsky.notification.list_notifications())
+        else:
+            raise
 
     if j.get('notifications'):
         new_last_indexed = j['notifications'][0]['indexed_at']
