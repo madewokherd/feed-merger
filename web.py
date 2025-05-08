@@ -475,7 +475,10 @@ def find_favicon(url):
 
 def get_author_info(url, author_name, is_author_link=False):
     result = {}
-    tokens = get_page_tokens(url)
+    try:
+        tokens = get_page_tokens(url)
+    except urllib.error.URLError:
+        return result
     if is_author_link:
         classes = ('author', 'headshot', 'head_shot', 'contributor', 'avatar')
     else:
