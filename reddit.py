@@ -148,7 +148,7 @@ def process_entry(entry, state, items):
         return False
 
     entry['fm:timestamp'] = datetime.datetime.fromtimestamp(entry['created'], datetime.timezone.utc).isoformat()
-    entry['fm:link'] = f"""https://www.reddit.com/{entry['permalink'].lstrip('/')}"""
+    entry['fm:base'] = entry['fm:link'] = f"""https://www.reddit.com/{entry['permalink'].lstrip('/')}"""
     entry['fm:feedname'] = entry['permalink'][1:entry['permalink'].find('/', 3)]
     entry['fm:author'] = entry['author']
     entry['fm:title'] = entry['title']
