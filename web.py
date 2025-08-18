@@ -17,8 +17,12 @@ PI = 'PI'
 UNKNOWN = 'UNKNOWN'
 
 class HtmlTokenizer(html.parser.HTMLParser):
-    def __init__(self, convert_charrefs=True):
+    def __init__(self, convert_charrefs=True, cdata=None, rcdata=None):
         self.tokens = []
+        if cdata is not None:
+            self.CDATA_CONTENT_ELEMENTS = cdata
+        if rcdata is not None:
+            self.RCDATA_CONTENT_ELEMENTS = cdata
         super().__init__(convert_charrefs=convert_charrefs)
 
     def handle_starttag(self, tag, attrs):
@@ -602,6 +606,11 @@ def handle_rss(url, js, state, data, data_str, tokens):
     prev_latest = state.get(('rss', url, 'latest'))
 
     new_latest = None
+
+    # Re-parse without special handling of <title> for HTML
+    parser = HtmlTokenizer(cdata=[], rcdata=[])
+    parser.feed(data_str)
+    tokens = parser.tokens
 
     stack = [('', js)] # tagname, dictionary
 
