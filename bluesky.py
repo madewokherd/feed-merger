@@ -312,7 +312,7 @@ def process_notifications(line, state):
         if prev_last_indexed:
             response = j
             while j['notifications'][0]['indexed_at'] > prev_last_indexed and response.get('cursor'):
-                response = to_json(client.app.bsky.notification.list_notifications(cursor = response['cursor']))
+                response = to_json(client.app.bsky.notification.list_notifications(params = {'cursor': response['cursor']}))
                 if response['notifications']:
                     j['notifications'].extend(response['notifications'])
                 else:
