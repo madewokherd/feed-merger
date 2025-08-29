@@ -720,6 +720,11 @@ def handle_atom(url, js, state, data, data_str, tokens):
 
     stack = [('', js)] # tagname, dictionary
 
+    # Re-parse without special handling of <title> for HTML
+    parser = HtmlTokenizer(cdata=[], rcdata=[])
+    parser.feed(data_str)
+    tokens = parser.tokens
+
     # split this into dictionaries
     for (token_type, token_name, token_data) in tokens:
         if token_type == STARTTAG and token_name in ('feed', 'channel'):
